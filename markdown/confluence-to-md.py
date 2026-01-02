@@ -382,7 +382,7 @@ class ConfluenceExporter:
 
 def parse_args():
     parser = argparse.ArgumentParser(description="Export Confluence Space to Markdown")
-    parser.add_argument("--url", default="https://legitscript.atlassian.net/wiki", help="Confluence Base URL")
+    parser.add_argument("--url", default=os.getenv("CONFLUENCE_URL"), help="Confluence Base URL")
     parser.add_argument("--space", required=True, help="Space Key to export")
     parser.add_argument("--email", default=os.getenv("CONFLUENCE_EMAIL"), help="Auth Email (default: env CONFLUENCE_EMAIL)")
     parser.add_argument("--token", default=os.getenv("CONFLUENCE_API_TOKEN"), help="API Token (default: env CONFLUENCE_API_TOKEN)")
