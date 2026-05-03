@@ -25,8 +25,8 @@
 
 ### Scoring & metadata
 
-- [ ] **WEB-04**: Maps `Result logic`, `Score category`, and `Score value` into the webhook fields used for recommendations (e.g. `product-recommendation`) following conventions illustrated by the example and documented in the script README.
-- [ ] **WEB-05**: Supports setting `quiz_title` via CLI flag or env when the CSV does not include a dedicated column.
+- [x] **WEB-04**: Maps `Result logic`, `Score category`, and `Score value` into the webhook fields used for recommendations (e.g. `product-recommendation`) following conventions illustrated by the example and documented in the script README.
+- [x] **WEB-05**: Supports setting `quiz_title` via CLI flag or env when the CSV does not include a dedicated column.
 
 ### Documentation
 
@@ -63,8 +63,8 @@
 | WEB-01 | Phase 2 | Pending |
 | WEB-02 | Phase 2 | Pending |
 | WEB-03 | Phase 2 | Pending |
-| WEB-04 | Phase 3 | Pending |
-| WEB-05 | Phase 3 | Pending |
+| WEB-04 | Phase 3 | Complete |
+| WEB-05 | Phase 3 | Complete |
 | OPS-01 | Phase 3 | Pending |
 
 **Coverage:**

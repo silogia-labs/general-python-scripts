@@ -72,7 +72,7 @@ Plans:
 
 Plans:
 
-- [ ] 03-01-PLAN.md — Scoring/placeholder keys + --quiz-title precedence (TDD; WEB-04, WEB-05)
+- [x] 03-01-PLAN.md — Scoring/placeholder keys + --quiz-title precedence (TDD; WEB-04, WEB-05)
 - [ ] 03-02-PLAN.md — Operator README + --help drift smoke test (OPS-01)
 
 ## Progress
