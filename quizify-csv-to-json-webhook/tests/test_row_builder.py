@@ -110,7 +110,7 @@ def test_contact_and_status_mapping(
     prefix = [decode_cell(c) for c in full_answers_row["prefix"]]
     dyn = [decode_cell(c) for c in full_answers_row["dynamic"]]
     trailer = [decode_cell(c) for c in full_answers_row["trailer"]]
-    row, warnings = build_row(prefix, dyn, trailer, decoded_headers)
+    row, warnings = build_row(prefix, dyn, trailer, decoded_headers, quiz_title="")
 
     assert row["firstName"] == "Scarlette"
     assert row["lastName"] == "Tester"
@@ -127,14 +127,14 @@ def test_status_date_passthrough(
     prefix = [decode_cell(c) for c in full_answers_row["prefix"]]
     dyn = [decode_cell(c) for c in full_answers_row["dynamic"]]
     trailer = [decode_cell(c) for c in full_answers_row["trailer"]]
-    row, warnings = build_row(prefix, dyn, trailer, decoded_headers)
+    row, warnings = build_row(prefix, dyn, trailer, decoded_headers, quiz_title="")
     assert row["statusDate"] == "2026-04-29"
     # ISO date should not warn
     assert not any("ISO" in w or "Date" in w for w in warnings)
 
     # Non-ISO triggers warning, value still emitted verbatim
     trailer_nonisodate = trailer[:5] + ["29-04-2026"]
-    row2, warnings2 = build_row(prefix, dyn, trailer_nonisodate, decoded_headers)
+    row2, warnings2 = build_row(prefix, dyn, trailer_nonisodate, decoded_headers, quiz_title="")
     assert row2["statusDate"] == "29-04-2026"
     assert any("Date" in w for w in warnings2)
 
@@ -146,7 +146,7 @@ def test_html_entity_decode(
     prefix = [decode_cell(c) for c in full_answers_row["prefix"]]
     dyn = [decode_cell(c) for c in full_answers_row["dynamic"]]
     trailer = [decode_cell(c) for c in full_answers_row["trailer"]]
-    row, _ = build_row(prefix, dyn, trailer, decoded_headers)
+    row, _ = build_row(prefix, dyn, trailer, decoded_headers, quiz_title="")
 
     # q-7 cell had &gt; → must be decoded in the object-array shape
     a7 = row["answers-7"]
@@ -171,7 +171,7 @@ def test_empty_cells_emit_all_keys(
     prefix = [decode_cell(c) for c in red_flag_short_circuit_row["prefix"]]
     dyn = [decode_cell(c) for c in red_flag_short_circuit_row["dynamic"]]
     trailer = [decode_cell(c) for c in red_flag_short_circuit_row["trailer"]]
-    row, _ = build_row(prefix, dyn, trailer, decoded_headers)
+    row, _ = build_row(prefix, dyn, trailer, decoded_headers, quiz_title="")
 
     # All 60 dynamic keys must exist
     for n in range(1, 21):
@@ -198,13 +198,13 @@ def test_top_level_tags_starts_with_source_quizify(
     prefix = [decode_cell(c) for c in full_answers_row["prefix"]]
     dyn = [decode_cell(c) for c in full_answers_row["dynamic"]]
     trailer = [decode_cell(c) for c in full_answers_row["trailer"]]
-    row, _ = build_row(prefix, dyn, trailer, decoded_headers)
+    row, _ = build_row(prefix, dyn, trailer, decoded_headers, quiz_title="")
     assert isinstance(row["tags"], list)
     assert row["tags"][0] == "source: quizify"
 
     # Unmatched tag falls into top-level tags + warning
     bad_trailer = trailer[:3] + ["totally_unknown_tag"] + trailer[4:]
-    row2, warnings2 = build_row(prefix, dyn, bad_trailer, decoded_headers)
+    row2, warnings2 = build_row(prefix, dyn, bad_trailer, decoded_headers, quiz_title="")
     assert "totally_unknown_tag" in row2["tags"]
     assert any("totally_unknown_tag" in w for w in warnings2)
 
@@ -217,7 +217,7 @@ def test_headers_are_html_unescaped_in_question_keys() -> None:
     trailer = ["", "", "", "", "00:10", "2026-01-01"]
     decoded_headers = [decode_cell(h) for h in headers]
     decoded_dyn = [decode_cell(c) for c in dyn]
-    row, _ = build_row(prefix, decoded_dyn, trailer, decoded_headers)
+    row, _ = build_row(prefix, decoded_dyn, trailer, decoded_headers, quiz_title="")
     assert row["question-1"] == "Tamaño > promedio?"
 
 
@@ -229,7 +229,7 @@ def test_full_answers_synthetic_row_shape(
     prefix = [decode_cell(c) for c in full_answers_row["prefix"]]
     dyn = [decode_cell(c) for c in full_answers_row["dynamic"]]
     trailer = [decode_cell(c) for c in full_answers_row["trailer"]]
-    row, warnings = build_row(prefix, dyn, trailer, decoded_headers)
+    row, warnings = build_row(prefix, dyn, trailer, decoded_headers, quiz_title="")
 
     # Tag routing for matched tags
     assert row["answers-tags-3"] == "no_red_flag"
@@ -256,3 +256,91 @@ def test_full_answers_synthetic_row_shape(
     for w in warnings:
         assert "@" not in w
         assert "+52" not in w
+
+
+# --- Phase 3: scoring + placeholders + quiz_title (D-01..D-05, D-16) -----
+
+
+def _minimal_decoded_inputs(
+    trailer: list[str] | None = None,
+) -> tuple[list[str], list[str], list[str], list[str]]:
+    """Tiny single-question synthetic input. Caller may supply a custom trailer."""
+    prefix = ["F", "L", "e@x.com", "false", "+1", "Yes"]
+    dynamic = ["Si"]
+    headers = ["Q1?"]
+    if trailer is None:
+        trailer = ["Score", "Test", "100", "", "00:30", "2024-01-15"]
+    return prefix, dynamic, trailer, headers
+
+
+def test_quiz_title_threaded_through_build_row() -> None:
+    prefix_d, dyn_d, trailer_d, headers_d = _minimal_decoded_inputs()
+    row, _ = build_row(prefix_d, dyn_d, trailer_d, headers_d, quiz_title="Autoevaluacion")
+    assert row["quiz_title"] == "Autoevaluacion"
+    # D-05: quiz_title is the 8th key (0-indexed position 7)
+    assert list(row.keys())[7] == "quiz_title"
+
+
+def test_scoring_pass_through() -> None:
+    prefix_d, dyn_d, _trailer_default, headers_d = _minimal_decoded_inputs()
+    trailer_d = ["Score", "Signos de Alarma", "500", "", "00:30", "2024-01-15"]
+    row, _ = build_row(prefix_d, dyn_d, trailer_d, headers_d, quiz_title="")
+    # D-01 / D-04: pass-through verbatim, string-typed
+    assert row["result-logic"] == "Score"
+    assert row["score-category"] == "Signos de Alarma"
+    assert row["score-value"] == "500"
+    assert isinstance(row["score-value"], str)
+
+
+def test_empty_scoring_emits_empty_strings() -> None:
+    prefix_d, dyn_d, _trailer_default, headers_d = _minimal_decoded_inputs()
+    trailer_d = ["", "", "", "", "", "2024-01-15"]
+    row, warnings_out = build_row(prefix_d, dyn_d, trailer_d, headers_d, quiz_title="")
+    # D-03: empty scoring cells emit "" verbatim, no WARNING
+    assert row["result-logic"] == ""
+    assert row["score-category"] == ""
+    assert row["score-value"] == ""
+    for w in warnings_out:
+        assert "result-logic" not in w
+        assert "score-category" not in w
+        assert "score-value" not in w
+        assert "Result logic" not in w
+        assert "Score category" not in w
+        assert "Score value" not in w
+
+
+def test_reserved_placeholders_match_locked_defaults() -> None:
+    prefix_d, dyn_d, trailer_d, headers_d = _minimal_decoded_inputs()
+    row, _ = build_row(prefix_d, dyn_d, trailer_d, headers_d, quiz_title="")
+    # D-02: locked defaults verbatim
+    assert row["product-recommendation"] is None
+    assert row["product-link-type"] is None
+    assert row["title"] == ""
+    assert row["type-page-url"] == ""
+
+
+def test_key_order_matches_d05() -> None:
+    prefix_d, dyn_d, trailer_d, headers_d = _minimal_decoded_inputs()
+    row, _ = build_row(prefix_d, dyn_d, trailer_d, headers_d, quiz_title="My Quiz")
+    keys = list(row.keys())
+    # Contact block (positions 0..6) + quiz_title at position 7
+    assert keys[:8] == [
+        "email",
+        "firstName",
+        "lastName",
+        "status",
+        "statusDate",
+        "phone",
+        "tags",
+        "quiz_title",
+    ]
+    # Final 7 keys: scoring trio + 4 placeholders in declared D-05 order
+    assert keys[-7:] == [
+        "result-logic",
+        "score-category",
+        "score-value",
+        "product-recommendation",
+        "product-link-type",
+        "title",
+        "type-page-url",
+    ]

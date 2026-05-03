@@ -23,18 +23,6 @@ ROOT = Path(__file__).resolve().parents[1]
 EXAMPLE = ROOT / "docs" / "webhook-quizify-format-example.json"
 SCRIPT = ROOT / "quizify_csv_ingest.py"
 
-# Phase-3-only top-level keys per .planning/ROADMAP.md and CONTEXT.md.
-# Phase 2 must NOT emit these; we strip them from the example before comparing.
-PHASE_3_KEYS = frozenset(
-    {
-        "quiz_title",
-        "product-recommendation",
-        "product-link-type",
-        "title",
-        "type-page-url",
-    }
-)
-
 # Phase 1 contact prefix + Phase 1 default trailer (kept in lock-step with
 # quizify_csv_ingest.CONTACT_PREFIX / DEFAULT_TRAILER).
 CONTACT_PREFIX = (
@@ -74,11 +62,6 @@ def strip_id(obj):
     return obj
 
 
-def strip_phase3(row: dict) -> dict:
-    """Drop Phase-3-only top-level keys from a row dict."""
-    return {k: v for k, v in row.items() if k not in PHASE_3_KEYS}
-
-
 def _example_first_row() -> dict:
     return json.loads(EXAMPLE.read_text(encoding="utf-8"))[0]
 
@@ -111,12 +94,12 @@ def _build_aligned_csv(csv_path: Path) -> None:
 
     dyn_cells = [cell_for(n) for n in range(1, 21)]
 
-    # Trailer: Phase 3 fields blank; tags carry the three matchable tokens
-    # the example shows (no_red_flag, goal_athlete, consent_given).
+    # Trailer: scoring fields populated for Phase 3 pass-through; tags carry
+    # the three matchable tokens the example shows.
     trailer_cells = [
-        "",                                              # Result logic
-        "",                                              # Score category
-        "",                                              # Score value
+        "Score",                                         # Result logic
+        "Signos de Alarma",                              # Score category
+        "500",                                           # Score value
         "no_red_flag, goal_athlete, consent_given",      # Answer tags
         "05:00",                                         # Time to complete
         "2025-11-18",                                    # Date
@@ -145,7 +128,7 @@ def run_aligned(tmp_path: Path) -> tuple[list[dict], str]:
     csv_path = tmp_path / "aligned.csv"
     _build_aligned_csv(csv_path)
     result = subprocess.run(
-        [sys.executable, str(SCRIPT), str(csv_path)],
+        [sys.executable, str(SCRIPT), str(csv_path), "--quiz-title", "Autoevaluacion"],
         capture_output=True,
         text=True,
         timeout=60,
@@ -164,13 +147,13 @@ def run_aligned(tmp_path: Path) -> tuple[list[dict], str]:
 
 
 def test_aligned_row_top_level_keyset_matches_example(tmp_path):
-    """Phase 2 emits exactly the example's top-level keys minus Phase 3 keys."""
+    """Phase 3 emits exactly the example's top-level key set (post-Phase-3)."""
     parsed, _ = run_aligned(tmp_path)
     assert len(parsed) == 1, f"expected exactly 1 emitted row, got {len(parsed)}"
     emitted = parsed[0]
     example = _example_first_row()
     emitted_keys = set(emitted.keys())
-    example_keys = set(example.keys()) - PHASE_3_KEYS
+    example_keys = set(example.keys())
     assert emitted_keys == example_keys, (
         f"missing={example_keys - emitted_keys} extra={emitted_keys - example_keys}"
     )
@@ -191,7 +174,7 @@ def test_aligned_row_per_key_types_match_example(tmp_path):
     """
     parsed, _ = run_aligned(tmp_path)
     emitted = parsed[0]
-    example = strip_phase3(strip_id(_example_first_row()))
+    example = strip_id(_example_first_row())
     shared = set(emitted) & set(example)
     assert shared, "expected at least one shared key"
     answer_value_types = (str, list)
@@ -236,13 +219,41 @@ def test_aligned_row_object_array_shape_no_id(tmp_path):
     assert saw_object_array, "expected at least one object-array answers-N"
 
 
-def test_no_phase_3_keys_present(tmp_path):
-    """Phase 2 must not emit any Phase-3-only top-level keys."""
+def test_key_order_locked(tmp_path):
+    """Phase 3 D-05: position 7 = quiz_title; final 7 keys are scoring + placeholders."""
     parsed, _ = run_aligned(tmp_path)
     emitted = parsed[0]
-    assert PHASE_3_KEYS.isdisjoint(emitted.keys()), (
-        f"Phase 3 keys leaked: {PHASE_3_KEYS & emitted.keys()}"
-    )
+    keys = list(emitted.keys())
+    assert keys[7] == "quiz_title", f"position 7 = {keys[7]!r}"
+    assert keys[-7:] == [
+        "result-logic",
+        "score-category",
+        "score-value",
+        "product-recommendation",
+        "product-link-type",
+        "title",
+        "type-page-url",
+    ], f"final 7 keys = {keys[-7:]}"
+
+
+def test_scoring_keys_present_after_phase3(tmp_path):
+    """D-01: pass-through verbatim from trailer cells [0..2]."""
+    parsed, _ = run_aligned(tmp_path)
+    emitted = parsed[0]
+    assert emitted["result-logic"] == "Score"
+    assert emitted["score-category"] == "Signos de Alarma"
+    assert emitted["score-value"] == "500"
+    assert emitted["quiz_title"] == "Autoevaluacion"
+
+
+def test_reserved_placeholders_match_defaults(tmp_path):
+    """D-02: locked defaults — null/null/""/"" verbatim regardless of CSV content."""
+    parsed, _ = run_aligned(tmp_path)
+    emitted = parsed[0]
+    assert emitted["product-recommendation"] is None
+    assert emitted["product-link-type"] is None
+    assert emitted["title"] == ""
+    assert emitted["type-page-url"] == ""
 
 
 def test_html_entity_round_trip(tmp_path):

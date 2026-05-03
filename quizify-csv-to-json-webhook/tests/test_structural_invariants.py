@@ -23,10 +23,13 @@ FIXTURE = ROOT / "docs" / "quizify-submissions.csv"
 # classification (Wave 1 SUMMARY: K = 20).
 EXPECTED_K = 20
 
-# Phase-3-only top-level keys; must NOT leak from Phase 2 output.
-PHASE_3_KEYS = frozenset(
+# Phase-3 required top-level keys; every emitted row MUST carry all of these.
+PHASE_3_REQUIRED_KEYS = frozenset(
     {
         "quiz_title",
+        "result-logic",
+        "score-category",
+        "score-value",
         "product-recommendation",
         "product-link-type",
         "title",
@@ -164,12 +167,95 @@ def test_no_html_entities_remain_in_output(emitted_payload):
     assert "&amp;" not in raw_stdout, "raw &amp; entity leaked into emitted JSON"
 
 
-def test_no_phase_3_keys_present(emitted_payload):
-    """Phase 2 must not emit any Phase-3-only top-level keys."""
+def test_every_row_has_phase3_required_keys(emitted_payload):
+    """Phase 3: every row MUST carry all Phase-3 keys (semantic inversion of
+    the Phase 2 must-NOT-leak invariant)."""
     rows, _ = emitted_payload
     for i, row in enumerate(rows):
-        leaked = PHASE_3_KEYS & row.keys()
-        assert not leaked, f"row {i} leaked Phase 3 keys {leaked}"
+        missing = PHASE_3_REQUIRED_KEYS - row.keys()
+        assert not missing, f"row {i} missing Phase 3 keys {missing}"
+
+
+def test_every_row_has_quiz_title(emitted_payload):
+    """D-06: quiz_title key always present, str-typed."""
+    rows, _ = emitted_payload
+    for i, row in enumerate(rows):
+        assert "quiz_title" in row, f"row {i} missing quiz_title"
+        assert isinstance(row["quiz_title"], str), (
+            f"row {i} quiz_title type={type(row['quiz_title']).__name__}"
+        )
+
+
+def test_every_row_has_scoring_keys(emitted_payload):
+    """D-01 / D-04: scoring trio always present, str-typed."""
+    rows, _ = emitted_payload
+    for i, row in enumerate(rows):
+        for k in ("result-logic", "score-category", "score-value"):
+            assert k in row, f"row {i} missing {k}"
+            assert isinstance(row[k], str), (
+                f"row {i} {k} type={type(row[k]).__name__}"
+            )
+
+
+def test_every_row_has_reserved_placeholders(emitted_payload):
+    """D-02: 4 reserved placeholders match locked defaults verbatim."""
+    rows, _ = emitted_payload
+    for i, row in enumerate(rows):
+        assert row["product-recommendation"] is None, (
+            f"row {i} product-recommendation={row['product-recommendation']!r}"
+        )
+        assert row["product-link-type"] is None, (
+            f"row {i} product-link-type={row['product-link-type']!r}"
+        )
+        assert row["title"] == "", f"row {i} title={row['title']!r}"
+        assert row["type-page-url"] == "", (
+            f"row {i} type-page-url={row['type-page-url']!r}"
+        )
+
+
+def test_key_order_locked(emitted_payload):
+    """D-05: position 7 is quiz_title; final 7 keys are scoring + placeholders
+    in declared order."""
+    rows, _ = emitted_payload
+    expected_tail = [
+        "result-logic",
+        "score-category",
+        "score-value",
+        "product-recommendation",
+        "product-link-type",
+        "title",
+        "type-page-url",
+    ]
+    for i, row in enumerate(rows):
+        keys = list(row.keys())
+        assert keys[7] == "quiz_title", f"row {i} keys[7]={keys[7]!r}"
+        assert keys[-7:] == expected_tail, (
+            f"row {i} final 7 keys = {keys[-7:]}"
+        )
+
+
+def test_quiz_title_default_empty_when_no_flag_or_env(tmp_path):
+    """D-07: when neither --quiz-title nor $QUIZIFY_QUIZ_TITLE is set, every
+    row emits quiz_title == "". Uses a function-scoped subprocess with
+    explicit env (excluding QUIZIFY_QUIZ_TITLE) to pin the contract
+    independently of the module-scoped fixture's ambient env."""
+    import os as _os
+
+    env = {k: v for k, v in _os.environ.items() if k != "QUIZIFY_QUIZ_TITLE"}
+    result = subprocess.run(
+        [sys.executable, str(SCRIPT), str(FIXTURE)],
+        capture_output=True,
+        text=True,
+        env=env,
+        timeout=60,
+        check=False,
+    )
+    assert result.returncode == 0, result.stderr
+    rows = json.loads(result.stdout)
+    for i, row in enumerate(rows):
+        assert row["quiz_title"] == "", (
+            f"row {i} quiz_title={row['quiz_title']!r}; expected \"\""
+        )
 
 
 def test_no_id_key_anywhere_in_serialized_output(emitted_payload):
