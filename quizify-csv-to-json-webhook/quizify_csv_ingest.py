@@ -8,6 +8,7 @@ import csv
 import html
 import json
 import logging
+import os
 import sys
 import unicodedata
 from pathlib import Path
@@ -83,6 +84,16 @@ TAG_HEADER_MAP = {
     "consent": "consiento",
 }
 
+# Phase 3 D-02: reserved placeholder keys with locked defaults; the CSV cannot
+# supply these, so we emit hard-coded values that match the example payload's
+# structural slots. Insertion order matches D-05's final-tail key order.
+SCORING_PLACEHOLDERS = {
+    "product-recommendation": None,
+    "product-link-type": None,
+    "title": "",
+    "type-page-url": "",
+}
+
 
 def decode_cell(s: str) -> str:
     """Decode HTML entities in a CSV cell (CONV-06, D-14). Identity on empty."""
@@ -114,6 +125,22 @@ def map_status(raw: str) -> tuple[str, str | None]:
     if v == "No" or v == "":
         return ("unsubscribed", None)
     return ("unsubscribed", f"unexpected status value {v!r}")
+
+
+def _resolve_quiz_title(args: argparse.Namespace, environ) -> str:
+    """D-07 precedence: CLI flag > env var > "" (future CSV column stub).
+
+    Decodes via html.unescape at the boundary (D-09); whitespace preserved
+    (D-09 forbids .strip()).
+    """
+    if args.quiz_title is not None:
+        return html.unescape(args.quiz_title)
+    env_val = environ.get("QUIZIFY_QUIZ_TITLE")
+    if env_val is not None:
+        return html.unescape(env_val)
+    # Future: CSV "Quiz title" column lookup goes here (D-07 stub; do not
+    # invent the header name without a real export proving it).
+    return ""
 
 
 def _norm_for_match(s: str) -> str:
@@ -174,6 +201,7 @@ def build_row(
     dynamic_cells_decoded: list[str],
     trailer_cells_decoded: list[str],
     dynamic_headers_decoded: list[str],
+    quiz_title: str,
 ) -> tuple[dict, list[str]]:
     """Build a single webhook-shaped row dict from already-decoded cells.
 
@@ -221,6 +249,7 @@ def build_row(
         "statusDate": status_date,
         "phone": phone,
         "tags": tags_list,
+        "quiz_title": quiz_title,
     }
     for i, header in enumerate(dynamic_headers_decoded):
         n = i + 1
@@ -228,6 +257,15 @@ def build_row(
         row[f"question-{n}"] = header
         row[f"answers-{n}"] = shape_answer(cell)
         row[f"answers-tags-{n}"] = ", ".join(matched_buckets.get(i, []))
+    # Phase 3 D-01: pass-through scoring keys from trailer_cells_decoded[0..2].
+    # Bounds-checked so a short trailer (e.g. malformed row) emits "" rather
+    # than raising IndexError. D-03: empty cells emit "" verbatim, no WARNING.
+    row["result-logic"] = trailer_cells_decoded[0] if len(trailer_cells_decoded) > 0 else ""
+    row["score-category"] = trailer_cells_decoded[1] if len(trailer_cells_decoded) > 1 else ""
+    row["score-value"] = trailer_cells_decoded[2] if len(trailer_cells_decoded) > 2 else ""
+    # Phase 3 D-02: 4 reserved placeholders, locked defaults. dict.update preserves
+    # SCORING_PLACEHOLDERS' declared insertion order, which matches D-05's tail.
+    row.update(SCORING_PLACEHOLDERS)
     return row, warnings_out
 
 
@@ -273,6 +311,7 @@ def convert(
     path: Path,
     trailer: tuple[str, ...] | None,
     output: Path | None,
+    quiz_title: str,
 ) -> int:
     """Phase 2 main path: CSV → list[dict] → JSON array on stdout or to file.
 
@@ -327,7 +366,7 @@ def convert(
             dynamic_d = decoded[p_len : expected_len - t_len]
             trailer_d = decoded[expected_len - t_len :]
             row_dict, warnings_out = build_row(
-                prefix_d, dynamic_d, trailer_d, dynamic_headers_decoded
+                prefix_d, dynamic_d, trailer_d, dynamic_headers_decoded, quiz_title
             )
             for w in warnings_out:
                 # `w` is constructed in build_row from column names + categorical
@@ -359,7 +398,14 @@ def main(argv: list[str] | None = None) -> int:
         action="store_true",
         help="Explicit JSON emission flag (default behavior; accepted for self-documenting scripts).",
     )
+    parser.add_argument(
+        "--quiz-title",
+        default=None,
+        help='Quiz title; falls back to $QUIZIFY_QUIZ_TITLE env var, then "". Decoded via html.unescape.',
+    )
     args = parser.parse_args(argv)
+
+    quiz_title = _resolve_quiz_title(args, os.environ)
 
     trailer_override: tuple[str, ...] | None = None
     if args.trailer_columns is not None:
@@ -374,7 +420,7 @@ def main(argv: list[str] | None = None) -> int:
     if args.dry_run:
         return dry_run(args.csv_path, trailer_override)
 
-    return convert(args.csv_path, trailer_override, args.output)
+    return convert(args.csv_path, trailer_override, args.output, quiz_title)
 
 
 if __name__ == "__main__":

@@ -147,15 +147,21 @@ def run_aligned(tmp_path: Path) -> tuple[list[dict], str]:
 
 
 def test_aligned_row_top_level_keyset_matches_example(tmp_path):
-    """Phase 3 emits exactly the example's top-level key set (post-Phase-3)."""
+    """Phase 3 emits a strict superset of the example's top-level key set
+    (D-05: scoring trio is slotted before placeholders so example shape is a
+    strict superset). The example payload lacks `result-logic` / `score-category`
+    / `score-value` — Phase 3 adds them per D-01."""
     parsed, _ = run_aligned(tmp_path)
     assert len(parsed) == 1, f"expected exactly 1 emitted row, got {len(parsed)}"
     emitted = parsed[0]
     example = _example_first_row()
     emitted_keys = set(emitted.keys())
     example_keys = set(example.keys())
-    assert emitted_keys == example_keys, (
-        f"missing={example_keys - emitted_keys} extra={emitted_keys - example_keys}"
+    missing = example_keys - emitted_keys
+    extra = emitted_keys - example_keys
+    assert not missing, f"emitted is missing example keys: {missing}"
+    assert extra == {"result-logic", "score-category", "score-value"}, (
+        f"unexpected extra keys (expected only the scoring trio): {extra}"
     )
 
 
@@ -178,7 +184,14 @@ def test_aligned_row_per_key_types_match_example(tmp_path):
     shared = set(emitted) & set(example)
     assert shared, "expected at least one shared key"
     answer_value_types = (str, list)
+    # Phase 3 D-02 deviates from the example for placeholder keys: example has
+    # "product-recommendation": "Basic", Phase 3 emits null because the CSV
+    # cannot supply it. Other placeholder defaults (None / "") may also diverge
+    # in type from the example. These are documented intentional deviations.
+    placeholder_keys = {"product-recommendation", "product-link-type", "title", "type-page-url"}
     for k in shared:
+        if k in placeholder_keys:
+            continue
         if k.startswith("answers-") and not k.startswith("answers-tags-"):
             # Both Phase 2 answer shapes (str for multi-select, list for
             # single-answer) are valid; the example uses both inconsistently.
