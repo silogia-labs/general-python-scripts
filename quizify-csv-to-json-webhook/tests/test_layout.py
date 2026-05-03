@@ -9,7 +9,7 @@ from pathlib import Path
 
 import pytest
 
-from quizify_csv_ingest import CONTACT_PREFIX, DEFAULT_TRAILER, classify_headers
+from quizify_csv_ingest import CONTACT_PREFIX, DEFAULT_TRAILER, classify_headers, parse_trailer_arg
 
 ROOT = Path(__file__).resolve().parents[1]
 FIXTURE = ROOT / "docs" / "quizify-submissions.csv"
@@ -39,6 +39,60 @@ def test_data_row_count_matches_fixture() -> None:
         next(reader)
         data_rows = list(reader)
     assert len(data_rows) == 42
+
+
+TRAILER_CLI = (
+    "Result logic,Score category,Score value,Answer tags,"
+    "Time to complete (mm:ss),Date"
+)
+
+
+def test_parse_trailer_arg_roundtrip() -> None:
+    parts = parse_trailer_arg(TRAILER_CLI)
+    assert parts == DEFAULT_TRAILER
+
+
+def test_parse_trailer_arg_rejects_empty() -> None:
+    with pytest.raises(ValueError):
+        parse_trailer_arg("")
+
+
+def test_dry_run_with_trailer_columns_override() -> None:
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(SCRIPT),
+            "--dry-run",
+            str(FIXTURE),
+            "--trailer-columns",
+            TRAILER_CLI,
+        ],
+        capture_output=True,
+        text=True,
+        timeout=60,
+        check=False,
+    )
+    assert result.returncode == 0
+    assert "Questions (dynamic): 20" in result.stderr
+
+
+def test_invalid_trailer_columns_exit_code() -> None:
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(SCRIPT),
+            "--dry-run",
+            str(FIXTURE),
+            "--trailer-columns",
+            "",
+        ],
+        capture_output=True,
+        text=True,
+        timeout=60,
+        check=False,
+    )
+    assert result.returncode == 2
+    assert "trailer-columns" in result.stderr.lower()
 
 
 def test_dry_run_stderr_row_count() -> None:
