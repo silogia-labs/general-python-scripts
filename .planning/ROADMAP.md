@@ -68,12 +68,12 @@ Plans:
 2. CLI exposes `--quiz-title` (or equivalent) and documents precedence vs CSV.
 3. README in `quizify-csv-to-json-webhook/` explains usage, limitations (missing IDs), and privacy notes.
 
-**Plans**: TBD
+**Plans:** 2 plans
 
 Plans:
 
-- [ ] 03-01: Map scoring columns + CLI flags for quiz title / output path
-- [ ] 03-02: Author README and pin minimal dependencies if any
+- [ ] 03-01-PLAN.md — Scoring/placeholder keys + --quiz-title precedence (TDD; WEB-04, WEB-05)
+- [ ] 03-02-PLAN.md — Operator README + --help drift smoke test (OPS-01)
 
 ## Progress
 
