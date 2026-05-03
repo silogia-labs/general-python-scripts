@@ -47,12 +47,12 @@ Plans:
 2. Each dynamic column produces matching `question-N`, `answers-N`, and `answers-tags-N` keys in order.
 3. HTML entities from CSV cells appear decoded in JSON strings.
 
-**Plans**: TBD
+**Plans:** 2 plans
 
 Plans:
 
-- [ ] 02-01: Implement row builder + answer typing (string vs object array)
-- [ ] 02-02: Golden-file comparison against `webhook-quizify-format-example.json` structure for an aligned fixture row
+- [ ] 02-01-PLAN.md — Row builder + answer typing (CONV-03..06, WEB-01..03) with CLI JSON emission
+- [ ] 02-02-PLAN.md — Golden-file structural diff + sample-CSV invariants (WEB-02, WEB-03)
 
 ### Phase 3: Scoring metadata & packaging
 
