@@ -5,6 +5,8 @@ from __future__ import annotations
 
 import argparse
 import csv
+import html
+import json
 import logging
 import sys
 import unicodedata
@@ -73,6 +75,160 @@ def classify_headers(
     dynamic = header_row[p_len : n - t_len]
     trailer_raw = header_row[n - t_len :]
     return prefix_raw, dynamic, trailer_raw
+
+
+TAG_HEADER_MAP = {
+    "red_flag": "signos de alarma",
+    "goal_": "objetivo",
+    "consent": "consiento",
+}
+
+
+def decode_cell(s: str) -> str:
+    """Decode HTML entities in a CSV cell (CONV-06, D-14). Identity on empty."""
+    return html.unescape(s)
+
+
+def shape_answer(decoded: str):
+    """Return webhook-shaped answer per D-05/D-06/D-08.
+
+    "" → "" ; ", " in cell → plain string ; else → single-element object array.
+    Never emits an "id" key (D-07).
+    """
+    if decoded == "":
+        return ""
+    if ", " in decoded:
+        return decoded
+    return [{"answer_name": decoded, "answer_img": None, "answer_tag": None}]
+
+
+def map_status(raw: str) -> tuple[str, str | None]:
+    """D-11: Yes→subscribed; No/empty→unsubscribed silent; other→unsubscribed+warn.
+
+    The warning message intentionally contains only the offending categorical
+    value (no email/phone/name) so it is PII-safe (T-PII-01).
+    """
+    v = raw.strip()
+    if v == "Yes":
+        return ("subscribed", None)
+    if v == "No" or v == "":
+        return ("unsubscribed", None)
+    return ("unsubscribed", f"unexpected status value {v!r}")
+
+
+def _norm_for_match(s: str) -> str:
+    return unicodedata.normalize("NFC", s).casefold()
+
+
+def _looks_iso(s: str) -> bool:
+    """Lightweight YYYY-MM-DD shape check; full date parsing deferred."""
+    if len(s) != 10:
+        return False
+    return (
+        s[4] == "-"
+        and s[7] == "-"
+        and s[:4].isdigit()
+        and s[5:7].isdigit()
+        and s[8:].isdigit()
+    )
+
+
+def match_tags_to_questions(
+    tag_csv: str,
+    dynamic_headers_decoded: list[str],
+) -> tuple[dict[int, list[str]], list[str]]:
+    """D-01..D-04: distribute Answer tags across dynamic question indices.
+
+    Splits on ", "; for each tag, finds the first TAG_HEADER_MAP pattern that is
+    a substring of the tag, then locates the first dynamic header whose
+    NFC+casefold form contains the corresponding header keyword. Multiple tags
+    matching the same question accumulate (caller joins with ", "). Tags that
+    match no pattern (or whose pattern's keyword is missing from the headers)
+    are returned as `unmatched`.
+    """
+    matched: dict[int, list[str]] = {}
+    unmatched: list[str] = []
+    if not tag_csv.strip():
+        return matched, unmatched
+    norm_headers = [_norm_for_match(h) for h in dynamic_headers_decoded]
+    for tag in (t.strip() for t in tag_csv.split(", ") if t.strip()):
+        tag_norm = _norm_for_match(tag)
+        hit_idx: int | None = None
+        for pattern, header_kw in TAG_HEADER_MAP.items():
+            if _norm_for_match(pattern) in tag_norm:
+                kw_norm = _norm_for_match(header_kw)
+                hit_idx = next(
+                    (i for i, h in enumerate(norm_headers) if kw_norm in h),
+                    None,
+                )
+                if hit_idx is not None:
+                    matched.setdefault(hit_idx, []).append(tag)
+                    break
+        if hit_idx is None:
+            unmatched.append(tag)
+    return matched, unmatched
+
+
+def build_row(
+    prefix_cells_decoded: list[str],
+    dynamic_cells_decoded: list[str],
+    trailer_cells_decoded: list[str],
+    dynamic_headers_decoded: list[str],
+) -> tuple[dict, list[str]]:
+    """Build a single webhook-shaped row dict from already-decoded cells.
+
+    Caller MUST pass cells already through decode_cell (per RESEARCH per-row
+    build sequence step 4). Returns (row_dict, warnings) where warnings is a
+    list of stderr-safe strings (no email/phone/name/free-text).
+
+    Key order: email, firstName, lastName, status, statusDate, phone, tags,
+    then question-N / answers-N / answers-tags-N for N=1..K (D-09).
+    """
+    warnings_out: list[str] = []
+    first_name = prefix_cells_decoded[0]
+    last_name = prefix_cells_decoded[1]
+    email = prefix_cells_decoded[2]
+    phone = prefix_cells_decoded[4]
+    status_raw = prefix_cells_decoded[5]
+
+    status_value, status_warn = map_status(status_raw)
+    if status_warn is not None:
+        warnings_out.append(f"column 'Subscribed to newsletter' {status_warn}")
+
+    status_date = trailer_cells_decoded[5]
+    if status_date and not _looks_iso(status_date):
+        warnings_out.append(
+            f"column 'Date' value {status_date!r} is not ISO YYYY-MM-DD; emitted verbatim"
+        )
+
+    answer_tags_csv = trailer_cells_decoded[3]
+    matched_buckets, unmatched_tags = match_tags_to_questions(
+        answer_tags_csv, dynamic_headers_decoded
+    )
+
+    tags_list: list[str] = ["source: quizify"]
+    for u in unmatched_tags:
+        tags_list.append(u)
+        warnings_out.append(
+            f"tag {u!r} did not match any question; appended to row tags"
+        )
+
+    row: dict = {
+        "email": email,
+        "firstName": first_name,
+        "lastName": last_name,
+        "status": status_value,
+        "statusDate": status_date,
+        "phone": phone,
+        "tags": tags_list,
+    }
+    for i, header in enumerate(dynamic_headers_decoded):
+        n = i + 1
+        cell = dynamic_cells_decoded[i] if i < len(dynamic_cells_decoded) else ""
+        row[f"question-{n}"] = header
+        row[f"answers-{n}"] = shape_answer(cell)
+        row[f"answers-tags-{n}"] = ", ".join(matched_buckets.get(i, []))
+    return row, warnings_out
 
 
 def configure_logging(verbose: bool) -> None:
