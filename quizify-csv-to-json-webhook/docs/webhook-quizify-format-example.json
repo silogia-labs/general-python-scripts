@@ -1,0 +1,188 @@
+[
+    {
+        "email": "silverpaezp@gmail.com",
+        "firstName": "Silveimar",
+        "lastName": "Paez",
+        "status": "subscribed",
+        "statusDate": "2025-11-18",
+        "phone": "+52 55 4888 7674",
+        "tags": [
+            "source: quizify"
+        ],
+        "quiz_title": "Autoevaluacion",
+        "question-1": "Rango de edad",
+        "answers-1": [
+            {
+                "answer_name": "35 - 44",
+                "id": 100455
+            }
+        ],
+        "answers-tags-1": "",
+        "question-2": "¿Fuiste asignada mujer al nacer?",
+        "answers-2": [
+            {
+                "answer_name": "Si",
+                "answer_img": null,
+                "answer_tag": null,
+                "id": 100458
+            }
+        ],
+        "answers-tags-2": "",
+        "question-3": "Reflexiona, ¿has presentado alguno de estos signos de alarma?",
+        "answers-3": "Ninguno",
+        "answers-tags-3": "no_red_flag",
+        "question-4": "Calidad de sueño",
+        "answers-4": [
+            {
+                "answer_name": "Regular",
+                "answer_img": null,
+                "answer_tag": null,
+                "id": 100477
+            }
+        ],
+        "answers-tags-4": "",
+        "question-5": "Estrés percibido (0-10)",
+        "answers-5": [
+            {
+                "answer_name": "4 - 6",
+                "answer_img": null,
+                "answer_tag": null,
+                "id": 100480
+            }
+        ],
+        "answers-tags-5": "",
+        "question-6": "Intensidad del dolor (0-10)",
+        "answers-6": [
+            {
+                "answer_name": "7 - 10",
+                "answer_img": null,
+                "answer_tag": null,
+                "id": 100506
+            }
+        ],
+        "answers-tags-6": "",
+        "question-7": "Historia obstétrica",
+        "answers-7": [
+            {
+                "answer_name": "Postpartum (últimos 24 meses)",
+                "answer_img": null,
+                "answer_tag": null,
+                "id": 100485
+            }
+        ],
+        "answers-tags-7": "",
+        "question-8": "Tipo de parto",
+        "answers-8": [
+            {
+                "answer_name": "Vaginal",
+                "answer_img": null,
+                "answer_tag": null,
+                "id": 100487
+            }
+        ],
+        "answers-tags-8": "",
+        "question-9": "Meses desde el parto",
+        "answers-9": [
+            {
+                "answer_name": "13 - 24 meses",
+                "answer_img": null,
+                "answer_tag": null,
+                "id": 100557
+            }
+        ],
+        "answers-tags-9": "",
+        "question-10": "Ciclo menstrual",
+        "answers-10": [
+            {
+                "answer_name": "Irregular",
+                "answer_img": null,
+                "answer_tag": null,
+                "id": 100493
+            }
+        ],
+        "answers-tags-10": "",
+        "question-11": "Perimenopausia/Menopausia",
+        "answers-11": [
+            {
+                "answer_name": "No aplica",
+                "answer_img": null,
+                "answer_tag": null,
+                "id": 100498
+            }
+        ],
+        "answers-tags-11": "",
+        "question-12": "Ubicación del dolor",
+        "answers-12": [
+            {
+                "answer_name": "Sacro/Cola",
+                "answer_img": null,
+                "answer_tag": null,
+                "id": 100500
+            }
+        ],
+        "answers-tags-12": "",
+        "question-13": "Duración del problema",
+        "answers-13": [
+            {
+                "answer_name": "> 12 semanas",
+                "answer_img": null,
+                "answer_tag": null,
+                "id": 100509
+            }
+        ],
+        "answers-tags-13": "",
+        "question-14": "¿Presentas alguno de estos síntomas de piso pélvico?",
+        "answers-14": "Escape de orina al toser/reír/saltar, Dolor en penetración o examen, Sensación de peso pélvico/prolapso",
+        "answers-tags-14": "",
+        "question-15": "Disparadores de crisis",
+        "answers-15": "Fase premenstrual/menstrual, Tos/estornudos/risas, Cargas/saltos/correr, Sentado prolongado/teletrabajo",
+        "answers-tags-15": "",
+        "question-16": "Limitaciones funcionales",
+        "answers-16": "No puedo entrenar, Dificulta tareas domésticas, Dificulta cuidado de hijos, Afecta vida sexual",
+        "answers-tags-16": "",
+        "question-17": "Mi objetivo principal es...",
+        "answers-17": [
+            {
+                "answer_name": "Volver al deporte",
+                "answer_img": null,
+                "answer_tag": null,
+                "id": 100541
+            }
+        ],
+        "answers-tags-17": "goal_athlete",
+        "question-18": "Nivel de deporte",
+        "answers-18": [
+            {
+                "answer_name": "Recreacional 2-3x/sem",
+                "answer_img": null,
+                "answer_tag": null,
+                "id": 100539
+            }
+        ],
+        "answers-tags-18": "",
+        "question-19": "Consiento que usen mis respuestas para mi resultado y recibir el plan por email.",
+        "answers-19": [
+            {
+                "answer_name": "Si",
+                "answer_img": null,
+                "answer_tag": null,
+                "id": 100552
+            }
+        ],
+        "answers-tags-19": "consent_given",
+        "question-20": "Tipo de Jornada laboral",
+        "answers-20": [
+            {
+                "answer_name": "Otro valor aqui",
+                "answer_img": null,
+                "answer_tag": null,
+                "id": 100649
+            }
+        ],
+        "answers-tags-20": "",
+        "product-recommendation": "Basic",
+        "product-link-type": null,
+        "title": "",
+        "type-page-url": ""
+    }
+]
