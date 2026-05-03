@@ -269,6 +269,82 @@ def dry_run(path: Path, trailer: tuple[str, ...] | None) -> int:
     return 0
 
 
+def convert(
+    path: Path,
+    trailer: tuple[str, ...] | None,
+    output: Path | None,
+) -> int:
+    """Phase 2 main path: CSV → list[dict] → JSON array on stdout or to file.
+
+    Per RESEARCH "Per-Row Build Sequence":
+      1. Open with utf-8-sig + newline=""
+      2. Read header, classify_headers; on LayoutError → log + return 1
+      3. Decode dynamic headers (D-14)
+      4. For each data row: length check, decode cells, build_row, log warnings
+      5. Dump results once (D-17: indent=2, ensure_ascii=False)
+
+    Note: results accumulate in memory. T-RESOURCE-01 (accept-with-threshold):
+    streaming/NDJSON output deferred to v2 if row count exceeds ~50k or per-row
+    payload > ~5KB (>250MB total).
+    """
+    exit_code = 0
+    results: list[dict] = []
+    try:
+        fh = path.open(encoding="utf-8-sig", newline="")
+    except OSError as err:
+        logging.error("cannot open CSV: %s", err)
+        return 1
+    with fh:
+        reader = csv.reader(fh)
+        try:
+            header = next(reader)
+        except StopIteration:
+            logging.error("CSV is empty")
+            return 1
+        try:
+            _prefix_h, dynamic_h, _trailer_h = classify_headers(header, trailer)
+        except LayoutError as err:
+            logging.error("%s", err)
+            return 1
+
+        dynamic_headers_decoded = [decode_cell(h) for h in dynamic_h]
+        expected_len = len(header)
+        p_len = len(CONTACT_PREFIX)
+        t_len = len(trailer if trailer is not None else DEFAULT_TRAILER)
+
+        for idx, row in enumerate(reader, start=1):
+            if len(row) != expected_len:
+                logging.warning(
+                    "row %d row length mismatch: expected %d fields, got %d",
+                    idx,
+                    expected_len,
+                    len(row),
+                )
+                exit_code |= 1
+                continue
+            decoded = [decode_cell(c) for c in row]
+            prefix_d = decoded[:p_len]
+            dynamic_d = decoded[p_len : expected_len - t_len]
+            trailer_d = decoded[expected_len - t_len :]
+            row_dict, warnings_out = build_row(
+                prefix_d, dynamic_d, trailer_d, dynamic_headers_decoded
+            )
+            for w in warnings_out:
+                # `w` is constructed in build_row from column names + categorical
+                # values only — never cell content (T-PII-01).
+                logging.warning("row %d %s", idx, w)
+            results.append(row_dict)
+
+    if output is None:
+        json.dump(results, sys.stdout, indent=2, ensure_ascii=False)
+        sys.stdout.write("\n")
+    else:
+        with output.open("w", encoding="utf-8") as out_fh:
+            json.dump(results, out_fh, indent=2, ensure_ascii=False)
+            out_fh.write("\n")
+    return exit_code
+
+
 def main(argv: list[str] | None = None) -> int:
     argv = argv if argv is not None else sys.argv[1:]
     parser = argparse.ArgumentParser(prog="quizify_csv_ingest")
@@ -276,6 +352,13 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("-v", "--verbose", action="store_true")
     parser.add_argument("--trailer-columns", default=None)
+    parser.add_argument("-o", "--output", type=Path, default=None,
+                        help="Write JSON array to PATH (UTF-8). Default: stdout.")
+    parser.add_argument(
+        "--emit-json",
+        action="store_true",
+        help="Explicit JSON emission flag (default behavior; accepted for self-documenting scripts).",
+    )
     args = parser.parse_args(argv)
 
     trailer_override: tuple[str, ...] | None = None
@@ -288,14 +371,10 @@ def main(argv: list[str] | None = None) -> int:
 
     configure_logging(args.verbose)
 
-    if not args.dry_run:
-        print(
-            "Phase 1: use --dry-run to classify headers (JSON conversion is Phase 2).",
-            file=sys.stderr,
-        )
-        return 2
+    if args.dry_run:
+        return dry_run(args.csv_path, trailer_override)
 
-    return dry_run(args.csv_path, trailer_override)
+    return convert(args.csv_path, trailer_override, args.output)
 
 
 if __name__ == "__main__":
