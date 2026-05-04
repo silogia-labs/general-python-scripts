@@ -1,16 +1,16 @@
 ---
 gsd_state_version: 1.0
 milestone: v1.1
-milestone_name: Contract Hardening
+milestone_name: Contract Hardening & Make.com Alignment
 status: planning
-last_updated: "2026-05-04T01:20:42.742Z"
-last_activity: 2026-05-04
+stopped_at: Phase 4 context gathered
+last_updated: "2026-05-04T02:34:19.349Z"
+last_activity: 2026-05-04 — Roadmap v1.1 created (Phases 4-6)
 progress:
   total_phases: 3
   completed_phases: 0
   total_plans: 0
   completed_plans: 0
-  percent: 0
 ---
 
 # Project State
@@ -44,6 +44,7 @@ Last activity: 2026-05-04 — Roadmap v1.1 created (Phases 4-6)
 See `.planning/PROJECT.md` Key Decisions table for the consolidated v1.0 + v1.1 decision log.
 
 **v1.1 locked decisions (do not re-question):**
+
 - VALI-01 library: `fastjsonschema` 2.21.2 as optional extra (`pip install '.[validate]'`); lazy import; preserves D-13.
 - VALI-01 is opt-in / strict-when-enabled (default off).
 - Peri-menopause canonical tag: `peri_menu` (underscore). Fix is consumer side (`score-calculations.js:213`).
@@ -75,6 +76,6 @@ None open.
 
 ## Session Continuity
 
-Last session: 2026-05-04 (v1.1 roadmap created)
-Stopped at: Roadmap written; Phases 4-6 defined; ready to plan
-Resume file: `.planning/ROADMAP.md` → Phase 4 details
+Last session: 2026-05-04T02:34:19.345Z
+Stopped at: Phase 4 context gathered
+Resume file: .planning/phases/04-make-com-js-contract-fixes/04-CONTEXT.md
