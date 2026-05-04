@@ -99,6 +99,7 @@ Each CSV submission row becomes one webhook-compatible JSON object with correct 
 | VALI-01 ships opt-in (default off) with `--validate` flag; strict-when-enabled (exits non-zero on schema violation) | Keeps v1.0's permissive default behavior intact for unflagged callers; gives CI/automation pipelines a fast-fail path. Unlocks AUTO-01 in v1.2 to gate POST on validation success. Avoids forcing v2.0 semver bump | v1.1 |
 | CONTRACT-01 fixes the Make.com side rather than emitting an alias key from Python | D-05 JSON tail-key order is locked; introducing `product_result` as an alias would override D-05 without justification. Single-line fix in `quizify-mapping.js:102` is correct | v1.1 |
 | No new JS test toolchain in v1.1 (manual verification against `quizify-submissions.csv` sample only) | Preserves v1.0's stdlib-only ethos; two short files don't justify a Node test runner. Revisit if `make-scripts/` grows beyond ~500 LOC | v1.1 — deferred to v1.2 if scope expands |
+| VALI-01 shipped (Phase 6 / D-06-01..D-06-25, 2026-05-04): `--validate` flag (opt-in) backed by Draft-07 schema at `docs/webhook-schema.json`; `fastjsonschema>=2.21.2` as optional `[validate]` extra; lazy import preserves D-13 stdlib-only-at-runtime; PII-safe stderr templates locked (D-06-19, D-06-20) | Closes v1.1 schema validation goal without forcing a runtime dependency on default callers; gives CI/automation a fast-fail path while keeping default behavior byte-for-byte unchanged | ✓ Shipped — v1.1 (2026-05-04) |
 
 ## Evolution
 
