@@ -1,79 +1,71 @@
 ---
 gsd_state_version: 1.0
 milestone: v1.0
-milestone_name: milestone
-status: verifying
-stopped_at: Phase 3 complete — milestone v1.0 ready for completion
-last_updated: "2026-05-04T00:02:49.138Z"
+milestone_name: MVP
+status: shipped
+stopped_at: v1.0 milestone shipped 2026-05-03
+last_updated: "2026-05-03T00:00:00.000Z"
 last_activity: 2026-05-03
 progress:
   total_phases: 3
-  completed_phases: 2
-  total_plans: 6
+  completed_phases: 3
+  total_plans: 5
   completed_plans: 5
-  percent: 83
+  percent: 100
 ---
 
 # Project State
 
 ## Project Reference
 
-See: `.planning/PROJECT.md` (updated 2026-05-03)
+See: `.planning/PROJECT.md` (updated 2026-05-03 after v1.0 milestone)
 
-**Core value:** CSV rows become webhook-compatible JSON without manual restructuring.  
-**Current focus:** Phase 03 — scoring-metadata-packaging
+**Core value:** Each CSV submission row becomes one webhook-compatible JSON object — without manual restructuring.
+**Current focus:** v1.0 shipped. Run `/gsd-new-milestone` to scope v1.1 (AUTO-01 / VALI-01 / streaming / `--trailer-columns` hardening).
 
 ## Current Position
 
-Phase: 03 (scoring-metadata-packaging) — COMPLETE
-Plan: 2 of 2 done
-Status: Ready for /gsd-verify-work then /gsd-complete-milestone
-Last activity: 2026-05-03
+Milestone: v1.0 MVP — SHIPPED 2026-05-03
+Phases: 3/3 complete
+Plans: 5/5 complete
+Tests: 71 passing (1.09s)
+Tag: v1.0
 
-Progress: [████████░░] 83%
+Progress: [██████████] 100%
 
 ## Performance Metrics
 
-**Velocity:**
+**Velocity (v1.0):**
 
-- Total plans completed: 0
-- Average duration: —
-- Total execution time: —
-
-**By Phase:**
-
-| Phase | Plans | Total | Avg/Plan |
-|-------|-------|-------|----------|
-| — | — | — | — |
-| Phase 03 P01 | 5min | 2 tasks | 5 files |
-| Phase 03 P02 | 10min | 2 tasks | 2 files |
+- Total plans completed: 5
+- Timeline: 2026-05-03 (single-day milestone, init through phase 3 close)
+- Files changed: 61 (+12,112 insertions)
 
 ## Accumulated Context
 
 ### Decisions
 
-See `.planning/PROJECT.md` Key Decisions. Recent notes:
-
-- Initialization skipped broad codebase mapping and parallel ecosystem research in favor of in-repo CSV/JSON contracts.
-- [Phase ?]: Phase 03-01: implemented quiz_title precedence (CLI > env > '') + scoring pass-through + 4 reserved placeholders; SCORING_PLACEHOLDERS module constant; row.update preserves D-05 tail order
-- [Phase 03-02]: Operator README authored at quizify-csv-to-json-webhook/README.md per D-11 ten-section structure (169 lines); README/--help drift smoke test added (tests/test_readme_help_alignment.py, 2 tests, ~40ms); OPS-01 closed; full suite 71/71 green
+See `.planning/PROJECT.md` Key Decisions table for the consolidated v1.0 decision log.
 
 ### Pending Todos
 
-None yet.
+None — milestone shipped.
 
 ### Blockers/Concerns
 
-None yet.
+None open.
 
 ## Deferred Items
 
 | Category | Item | Status | Deferred At |
 |----------|------|--------|-------------|
-| *(none)* | | | |
+| feature | AUTO-01 (HTTP POST mode) | v2 | 2026-05-03 |
+| feature | VALI-01 (JSON Schema validation) | v2 | 2026-05-03 |
+| performance | T-RESOURCE-01 (streaming/NDJSON for >50k rows) | v2 | 2026-05-03 |
+| robustness | `--trailer-columns` name-based scoring lookup | v2 | 2026-05-03 |
 
 ## Session Continuity
 
-Last session: 2026-05-04T00:02:49.129Z
-Stopped at: Phase 3 complete — milestone v1.0 ready for completion
-Resume file: .planning/phases/03-scoring-metadata-packaging/03-VERIFICATION.md
+Last session: 2026-05-03 (v1.0 milestone close)
+Stopped at: v1.0 milestone shipped 2026-05-03
+Resume file: `.planning/MILESTONES.md`
