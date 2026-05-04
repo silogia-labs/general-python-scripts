@@ -74,6 +74,6 @@
 | 1. CSV ingestion & column layout | v1.0 | 1/1 | Complete | 2026-05-03 |
 | 2. Core webhook mapping | v1.0 | 2/2 | Complete | 2026-05-03 |
 | 3. Scoring metadata & packaging | v1.0 | 2/2 | Complete | 2026-05-03 |
-| 4. Make.com JS Contract Fixes | v1.1 | 2/2 | Complete   | 2026-05-04 |
+| 4. Make.com JS Contract Fixes | v1.1 | 2/2 | Complete    | 2026-05-04 |
 | 5. Python Trailer Hardening | v1.1 | 0/? | Not started | - |
 | 6. JSON Schema Validation | v1.1 | 0/? | Not started | - |

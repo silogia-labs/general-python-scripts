@@ -25,12 +25,12 @@ Requirements for v1.1. Each maps to exactly one roadmap phase. Continues v1.0's 
 
 ### Contract Reconciliation (CONTRACT-XX)
 
-- [ ] **CONTRACT-01**: `quizify-csv-to-json-webhook/make-scripts/quizify-mapping.js` reads `record["product-recommendation"]` (matching D-05 locked Python output) instead of the dead `record.product_result`; manual verification confirms the JS output object exposes the recommendation passthrough whenever the Python payload emits a non-null value
+- [x] **CONTRACT-01**: `quizify-csv-to-json-webhook/make-scripts/quizify-mapping.js` reads `record["product-recommendation"]` (matching D-05 locked Python output) instead of the dead `record.product_result`; manual verification confirms the JS output object exposes the recommendation passthrough whenever the Python payload emits a non-null value
 
 ### Make.com JS Fixes (MAKE-FIX-XX)
 
-- [ ] **MAKE-FIX-01**: Peri-menopause tag is canonically `peri_menu` (underscore) across both `quizify-mapping.js` and `score-calculations.js`. The hyphen variant `"peri-menu"` at `score-calculations.js:213` is replaced with `"peri_menu"` so the `peri_menopause_menopause` life-stage classification is detected for matching respondents
-- [ ] **MAKE-FIX-02**: `score-calculations.js:247-250` `activity_profile` condition is corrected so `data.is_athlete === true` yields `"athlete"` and otherwise yields `"non_athlete"` (current inverted logic mis-classifies the entire respondent population)
+- [x] **MAKE-FIX-01**: Peri-menopause tag is canonically `peri_menu` (underscore) across both `quizify-mapping.js` and `score-calculations.js`. The hyphen variant `"peri-menu"` at `score-calculations.js:213` is replaced with `"peri_menu"` so the `peri_menopause_menopause` life-stage classification is detected for matching respondents
+- [x] **MAKE-FIX-02**: `score-calculations.js:247-250` `activity_profile` condition is corrected so `data.is_athlete === true` yields `"athlete"` and otherwise yields `"non_athlete"` (current inverted logic mis-classifies the entire respondent population)
 - [x] **MAKE-FIX-03**: Manual verification steps are documented in `quizify-csv-to-json-webhook/make-scripts/CONVENTIONS.md` (new file) covering: (a) MAKE-FIX-01 verification using sample rows 10 (Karen Retamal) and 35 (Javielys Mancilla) of `docs/quizify-submissions.csv` — both have `Perimenopausia` in `menopause_status`; (b) MAKE-FIX-02 verification using a non-athlete row (sport_level not containing "alto"); (c) CONTRACT-01 verification approach for the `product-recommendation` passthrough; (d) tag canonical-spelling convention (snake_case underscores throughout)
 
 ## Future Requirements (v1.2+)
@@ -81,9 +81,9 @@ Filled by `gsd-roadmapper` during phase planning.
 | TRAIL-01 | Phase 5 | Pending |
 | TRAIL-02 | Phase 5 | Pending |
 | TRAIL-03 | Phase 5 | Pending |
-| CONTRACT-01 | Phase 4 | Pending |
-| MAKE-FIX-01 | Phase 4 | Pending |
-| MAKE-FIX-02 | Phase 4 | Pending |
+| CONTRACT-01 | Phase 4 | Complete |
+| MAKE-FIX-01 | Phase 4 | Complete |
+| MAKE-FIX-02 | Phase 4 | Complete |
 | MAKE-FIX-03 | Phase 4 | Complete |
 
 **Coverage:**
