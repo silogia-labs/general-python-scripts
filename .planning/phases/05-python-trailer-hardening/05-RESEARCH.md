@@ -494,24 +494,23 @@ def test_default_order_byte_identical_to_v1_0_baseline(sample_csv_path, tmp_path
 | A5 | Generating the v1.0 golden fixture from the *current* `main` branch (post-Phase-4) is equivalent to "v1.0 baseline" because Phases 1–4 made no changes to scoring trio output | Pitfall G / Validation Architecture | LOW — Phase 4 was JS-only (zero Python edits per CONTEXT.md `<domain>`); confirmed by `git log` showing Phase 4 changes only under `make-scripts/` and docs. |
 | A6 | The `pytest` `caplog` records intercept `logging.warning` calls correctly even with `configure_logging`'s `force=True` reset | Code Examples | LOW — `caplog.at_level(logging.WARNING)` installs its own handler; pytest's docs state this works alongside basicConfig. If it doesn't, fall back to `capsys.readouterr().err` substring assertion. |
 
-## Open Questions
+## Open Questions (RESOLVED)
 
 1. **Is the dirty `quizify-submissions.csv` working-copy change intentional?**
    - What we know: 43+/43- diff vs HEAD; tests fail with `Contact prefix mismatch at column 1: expected 'Last name', got ' "Last name"      '`.
-   - What's unclear: whether the user is mid-experiment with a CSV-format change, or whether this is leftover from another task.
-   - Recommendation: **planner must add a "verify fixture state with user" precondition task** OR ask before scheduling tasks. Without resolution, Phase 5 cannot be verified end-to-end.
+   - **RESOLVED:** User confirmed the diff was an accidental line-ending/BOM rewrite (not intentional). CSV reverted via `git checkout --` before plans were spawned; baseline `71 passed in 1.10s` re-confirmed. Plan 01 Task 1 step 1 verifies cleanliness as a non-destructive precondition (no revert action).
 
 2. **Where does the v1.0 golden fixture live — `tests/fixtures/` or `docs/`?**
    - What we know: `docs/` has the canonical input CSV and the single-row example payload; `tests/` has no `fixtures/` subdir today.
-   - What's unclear: project convention.
-   - Recommendation: create `tests/fixtures/v1.0_default_order_output.json` (test-only artifact, not user-facing).
+   - **RESOLVED:** Adopted recommendation. Plan 01 Task 1 creates `quizify-csv-to-json-webhook/tests/fixtures/v1.0_default_order_output.json` (test-only artifact, not user-facing); convention follows the recommendation.
 
 3. **Should the `_build_scoring_index_map` helper be top-level or nested?**
    - What we know: D-05 marks this as Claude's discretion; existing helpers (`_norm_for_match`, `_looks_iso`, `_resolve_quiz_title`) are top-level.
-   - Recommendation: top-level for testability and style match.
+   - **RESOLVED:** Top-level (planner's choice in Plan 02 Task 2 production excerpt — matches existing helper style).
 
 4. **Does the user want a single commit for all of Phase 5, or split (production / tests / docs)?**
-   - D-05 marks as Claude's discretion. Recommendation: split into 3 commits — (a) production change + signature update + dry_run unpack + new convert warning loop, (b) test churn + new test classes + golden fixture, (c) README + MILESTONES + PROJECT.md decision-log updates. Three commits each individually green for `pytest`.
+   - D-05 marks as Claude's discretion.
+   - **RESOLVED:** Split implicitly enforced by the wave structure — Plan 01 (Wave 0 fixtures), Plan 02 (Wave 1 production + test churn + new test classes), Plan 03 (Wave 2 regression test + docs). Each plan commits atomically and each ends in a green pytest. The original 3-commit recommendation is preserved by the plan boundaries.
 
 ## Sources
 
