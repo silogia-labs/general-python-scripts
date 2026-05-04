@@ -105,13 +105,16 @@ def test_tag_distribution(dynamic_headers: list[str]) -> None:
 
 
 def test_contact_and_status_mapping(
-    full_answers_row: dict, dynamic_headers: list[str]
+    full_answers_row: dict, dynamic_headers: list[str], scoring_index_map_default
 ) -> None:
     decoded_headers = [decode_cell(h) for h in dynamic_headers]
     prefix = [decode_cell(c) for c in full_answers_row["prefix"]]
     dyn = [decode_cell(c) for c in full_answers_row["dynamic"]]
     trailer = [decode_cell(c) for c in full_answers_row["trailer"]]
-    row, warnings = build_row(prefix, dyn, trailer, decoded_headers, quiz_title="")
+    row, warnings = build_row(
+        prefix, dyn, trailer, decoded_headers,
+        quiz_title="", scoring_index_map=scoring_index_map_default,
+    )
 
     assert row["firstName"] == "Scarlette"
     assert row["lastName"] == "Tester"
@@ -122,32 +125,41 @@ def test_contact_and_status_mapping(
 
 
 def test_status_date_passthrough(
-    full_answers_row: dict, dynamic_headers: list[str]
+    full_answers_row: dict, dynamic_headers: list[str], scoring_index_map_default
 ) -> None:
     decoded_headers = [decode_cell(h) for h in dynamic_headers]
     prefix = [decode_cell(c) for c in full_answers_row["prefix"]]
     dyn = [decode_cell(c) for c in full_answers_row["dynamic"]]
     trailer = [decode_cell(c) for c in full_answers_row["trailer"]]
-    row, warnings = build_row(prefix, dyn, trailer, decoded_headers, quiz_title="")
+    row, warnings = build_row(
+        prefix, dyn, trailer, decoded_headers,
+        quiz_title="", scoring_index_map=scoring_index_map_default,
+    )
     assert row["statusDate"] == "2026-04-29"
     # ISO date should not warn
     assert not any("ISO" in w or "Date" in w for w in warnings)
 
     # Non-ISO triggers warning, value still emitted verbatim
     trailer_nonisodate = trailer[:5] + ["29-04-2026"]
-    row2, warnings2 = build_row(prefix, dyn, trailer_nonisodate, decoded_headers, quiz_title="")
+    row2, warnings2 = build_row(
+        prefix, dyn, trailer_nonisodate, decoded_headers,
+        quiz_title="", scoring_index_map=scoring_index_map_default,
+    )
     assert row2["statusDate"] == "29-04-2026"
     assert any("Date" in w for w in warnings2)
 
 
 def test_html_entity_decode(
-    full_answers_row: dict, dynamic_headers: list[str]
+    full_answers_row: dict, dynamic_headers: list[str], scoring_index_map_default
 ) -> None:
     decoded_headers = [decode_cell(h) for h in dynamic_headers]
     prefix = [decode_cell(c) for c in full_answers_row["prefix"]]
     dyn = [decode_cell(c) for c in full_answers_row["dynamic"]]
     trailer = [decode_cell(c) for c in full_answers_row["trailer"]]
-    row, _ = build_row(prefix, dyn, trailer, decoded_headers, quiz_title="")
+    row, _ = build_row(
+        prefix, dyn, trailer, decoded_headers,
+        quiz_title="", scoring_index_map=scoring_index_map_default,
+    )
 
     # q-7 cell had &gt; → must be decoded in the object-array shape
     a7 = row["answers-7"]
@@ -166,13 +178,16 @@ def test_html_entity_decode(
 
 
 def test_empty_cells_emit_all_keys(
-    red_flag_short_circuit_row: dict, dynamic_headers: list[str]
+    red_flag_short_circuit_row: dict, dynamic_headers: list[str], scoring_index_map_default
 ) -> None:
     decoded_headers = [decode_cell(h) for h in dynamic_headers]
     prefix = [decode_cell(c) for c in red_flag_short_circuit_row["prefix"]]
     dyn = [decode_cell(c) for c in red_flag_short_circuit_row["dynamic"]]
     trailer = [decode_cell(c) for c in red_flag_short_circuit_row["trailer"]]
-    row, _ = build_row(prefix, dyn, trailer, decoded_headers, quiz_title="")
+    row, _ = build_row(
+        prefix, dyn, trailer, decoded_headers,
+        quiz_title="", scoring_index_map=scoring_index_map_default,
+    )
 
     # All 60 dynamic keys must exist
     for n in range(1, 21):
@@ -193,24 +208,30 @@ def test_empty_cells_emit_all_keys(
 
 
 def test_top_level_tags_starts_with_source_quizify(
-    full_answers_row: dict, dynamic_headers: list[str]
+    full_answers_row: dict, dynamic_headers: list[str], scoring_index_map_default
 ) -> None:
     decoded_headers = [decode_cell(h) for h in dynamic_headers]
     prefix = [decode_cell(c) for c in full_answers_row["prefix"]]
     dyn = [decode_cell(c) for c in full_answers_row["dynamic"]]
     trailer = [decode_cell(c) for c in full_answers_row["trailer"]]
-    row, _ = build_row(prefix, dyn, trailer, decoded_headers, quiz_title="")
+    row, _ = build_row(
+        prefix, dyn, trailer, decoded_headers,
+        quiz_title="", scoring_index_map=scoring_index_map_default,
+    )
     assert isinstance(row["tags"], list)
     assert row["tags"][0] == "source: quizify"
 
     # Unmatched tag falls into top-level tags + warning
     bad_trailer = trailer[:3] + ["totally_unknown_tag"] + trailer[4:]
-    row2, warnings2 = build_row(prefix, dyn, bad_trailer, decoded_headers, quiz_title="")
+    row2, warnings2 = build_row(
+        prefix, dyn, bad_trailer, decoded_headers,
+        quiz_title="", scoring_index_map=scoring_index_map_default,
+    )
     assert "totally_unknown_tag" in row2["tags"]
     assert any("totally_unknown_tag" in w for w in warnings2)
 
 
-def test_headers_are_html_unescaped_in_question_keys() -> None:
+def test_headers_are_html_unescaped_in_question_keys(scoring_index_map_default) -> None:
     # Synthetic header with HTML entity to confirm question-N values are decoded
     headers = ["Tamaño &gt; promedio?"]
     prefix = ["F", "L", "e@x.com", "false", "+1", "Yes"]
@@ -218,19 +239,25 @@ def test_headers_are_html_unescaped_in_question_keys() -> None:
     trailer = ["", "", "", "", "00:10", "2026-01-01"]
     decoded_headers = [decode_cell(h) for h in headers]
     decoded_dyn = [decode_cell(c) for c in dyn]
-    row, _ = build_row(prefix, decoded_dyn, trailer, decoded_headers, quiz_title="")
+    row, _ = build_row(
+        prefix, decoded_dyn, trailer, decoded_headers,
+        quiz_title="", scoring_index_map=scoring_index_map_default,
+    )
     assert row["question-1"] == "Tamaño > promedio?"
 
 
 def test_full_answers_synthetic_row_shape(
-    full_answers_row: dict, dynamic_headers: list[str]
+    full_answers_row: dict, dynamic_headers: list[str], scoring_index_map_default
 ) -> None:
     """Synthetic SCARLETTE-style row exercises the full mapping contract."""
     decoded_headers = [decode_cell(h) for h in dynamic_headers]
     prefix = [decode_cell(c) for c in full_answers_row["prefix"]]
     dyn = [decode_cell(c) for c in full_answers_row["dynamic"]]
     trailer = [decode_cell(c) for c in full_answers_row["trailer"]]
-    row, warnings = build_row(prefix, dyn, trailer, decoded_headers, quiz_title="")
+    row, warnings = build_row(
+        prefix, dyn, trailer, decoded_headers,
+        quiz_title="", scoring_index_map=scoring_index_map_default,
+    )
 
     # Tag routing for matched tags
     assert row["answers-tags-3"] == "no_red_flag"
@@ -274,18 +301,24 @@ def _minimal_decoded_inputs(
     return prefix, dynamic, trailer, headers
 
 
-def test_quiz_title_threaded_through_build_row() -> None:
+def test_quiz_title_threaded_through_build_row(scoring_index_map_default) -> None:
     prefix_d, dyn_d, trailer_d, headers_d = _minimal_decoded_inputs()
-    row, _ = build_row(prefix_d, dyn_d, trailer_d, headers_d, quiz_title="Autoevaluacion")
+    row, _ = build_row(
+        prefix_d, dyn_d, trailer_d, headers_d,
+        quiz_title="Autoevaluacion", scoring_index_map=scoring_index_map_default,
+    )
     assert row["quiz_title"] == "Autoevaluacion"
     # D-05: quiz_title is the 8th key (0-indexed position 7)
     assert list(row.keys())[7] == "quiz_title"
 
 
-def test_scoring_pass_through() -> None:
+def test_scoring_pass_through(scoring_index_map_default) -> None:
     prefix_d, dyn_d, _trailer_default, headers_d = _minimal_decoded_inputs()
     trailer_d = ["Score", "Signos de Alarma", "500", "", "00:30", "2024-01-15"]
-    row, _ = build_row(prefix_d, dyn_d, trailer_d, headers_d, quiz_title="")
+    row, _ = build_row(
+        prefix_d, dyn_d, trailer_d, headers_d,
+        quiz_title="", scoring_index_map=scoring_index_map_default,
+    )
     # D-01 / D-04: pass-through verbatim, string-typed
     assert row["result-logic"] == "Score"
     assert row["score-category"] == "Signos de Alarma"
@@ -293,10 +326,13 @@ def test_scoring_pass_through() -> None:
     assert isinstance(row["score-value"], str)
 
 
-def test_empty_scoring_emits_empty_strings() -> None:
+def test_empty_scoring_emits_empty_strings(scoring_index_map_default) -> None:
     prefix_d, dyn_d, _trailer_default, headers_d = _minimal_decoded_inputs()
     trailer_d = ["", "", "", "", "", "2024-01-15"]
-    row, warnings_out = build_row(prefix_d, dyn_d, trailer_d, headers_d, quiz_title="")
+    row, warnings_out = build_row(
+        prefix_d, dyn_d, trailer_d, headers_d,
+        quiz_title="", scoring_index_map=scoring_index_map_default,
+    )
     # D-03: empty scoring cells emit "" verbatim, no WARNING
     assert row["result-logic"] == ""
     assert row["score-category"] == ""
@@ -310,9 +346,12 @@ def test_empty_scoring_emits_empty_strings() -> None:
         assert "Score value" not in w
 
 
-def test_reserved_placeholders_match_locked_defaults() -> None:
+def test_reserved_placeholders_match_locked_defaults(scoring_index_map_default) -> None:
     prefix_d, dyn_d, trailer_d, headers_d = _minimal_decoded_inputs()
-    row, _ = build_row(prefix_d, dyn_d, trailer_d, headers_d, quiz_title="")
+    row, _ = build_row(
+        prefix_d, dyn_d, trailer_d, headers_d,
+        quiz_title="", scoring_index_map=scoring_index_map_default,
+    )
     # D-02: locked defaults verbatim
     assert row["product-recommendation"] is None
     assert row["product-link-type"] is None
@@ -320,9 +359,12 @@ def test_reserved_placeholders_match_locked_defaults() -> None:
     assert row["type-page-url"] == ""
 
 
-def test_key_order_matches_d05() -> None:
+def test_key_order_matches_d05(scoring_index_map_default) -> None:
     prefix_d, dyn_d, trailer_d, headers_d = _minimal_decoded_inputs()
-    row, _ = build_row(prefix_d, dyn_d, trailer_d, headers_d, quiz_title="My Quiz")
+    row, _ = build_row(
+        prefix_d, dyn_d, trailer_d, headers_d,
+        quiz_title="My Quiz", scoring_index_map=scoring_index_map_default,
+    )
     keys = list(row.keys())
     # Contact block (positions 0..6) + quiz_title at position 7
     assert keys[:8] == [
@@ -394,19 +436,22 @@ class TestMissingColumnWarning:
         assert row["score-value"] == "VAL"
 
     def test_warning_message_matches_locked_template(self, tmp_path, caplog) -> None:
-        # Build a 1-row CSV whose --trailer-columns omits "Result logic"
+        # Build a 1-row CSV whose --trailer-columns omits "Result logic".
+        # Use a 6-column custom trailer: replace "Result logic" with a non-trio
+        # placeholder column "Notes" while keeping Answer tags at index 3 and
+        # Date at index 5 (D-05-05: positional reads for those two are out of scope).
         import csv as _csv
         from quizify_csv_ingest import CONTACT_PREFIX, convert
         csv_path = tmp_path / "missing_result_logic.csv"
         custom_trailer = (
-            "Score category", "Score value", "Answer tags",
-            "Time to complete (mm:ss)", "Date",
+            "Notes", "Score category", "Score value",
+            "Answer tags", "Time to complete (mm:ss)", "Date",
         )
         header = list(CONTACT_PREFIX) + ["q1"] + list(custom_trailer)
         row = [
             "First", "Last", "x@example.com", "Yes", "555-0100", "Yes",
             "Q1 cell",
-            "cat", "100", "tag1", "00:30", "2024-01-15",
+            "note text", "cat", "100", "tag1", "00:30", "2024-01-15",
         ]
         with csv_path.open("w", encoding="utf-8", newline="") as f:
             w = _csv.writer(f)
@@ -424,19 +469,19 @@ class TestMissingColumnWarning:
         assert len(matches) == 1, [r.getMessage() for r in caplog.records]
 
     def test_warning_pii_safe(self, tmp_path, caplog) -> None:
-        # Same fixture as above — confirm the warning message contains no PII tokens
+        # Same fixture shape as above — 6-col trailer, "Result logic" omitted.
         import csv as _csv
         from quizify_csv_ingest import CONTACT_PREFIX, convert
         csv_path = tmp_path / "pii_check.csv"
         custom_trailer = (
-            "Score category", "Score value", "Answer tags",
-            "Time to complete (mm:ss)", "Date",
+            "Notes", "Score category", "Score value",
+            "Answer tags", "Time to complete (mm:ss)", "Date",
         )
         header = list(CONTACT_PREFIX) + ["q1"] + list(custom_trailer)
         row = [
             "PIINAME", "LASTPII", "leak@example.com", "Yes", "+15550100", "Yes",
             "PIIANSWER",
-            "cat", "100", "tag1", "00:30", "2024-01-15",
+            "note text", "cat", "100", "tag1", "00:30", "2024-01-15",
         ]
         with csv_path.open("w", encoding="utf-8", newline="") as f:
             w = _csv.writer(f)

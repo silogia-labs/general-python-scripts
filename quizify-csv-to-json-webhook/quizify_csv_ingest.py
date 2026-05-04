@@ -31,6 +31,15 @@ DEFAULT_TRAILER = (
     "Date",
 )
 
+# D-05-08: output-key mapping for the missing-column WARNING in convert().
+# Compile-time constant — values come from D-05's locked output schema; these
+# are NEVER user-controlled, so interpolating them in a log message is safe.
+_OUTPUT_KEY_BY_CANONICAL: dict[str, str] = {
+    "Result logic":   "result-logic",
+    "Score category": "score-category",
+    "Score value":    "score-value",
+}
+
 
 class LayoutError(ValueError):
     """Raised when header row does not match expected Quizify layout."""
@@ -51,7 +60,7 @@ def parse_trailer_arg(s: str) -> tuple[str, ...]:
 def classify_headers(
     header_row: list[str],
     trailer: tuple[str, ...] | None = None,
-) -> tuple[list[str], list[str], list[str]]:
+) -> tuple[list[str], list[str], list[str], dict[str, int], tuple[str, ...]]:
     trailer = trailer if trailer is not None else DEFAULT_TRAILER
     p_len = len(CONTACT_PREFIX)
     t_len = len(trailer)
@@ -75,7 +84,25 @@ def classify_headers(
     prefix_raw = header_row[:p_len]
     dynamic = header_row[p_len : n - t_len]
     trailer_raw = header_row[n - t_len :]
-    return prefix_raw, dynamic, trailer_raw
+
+    # D-05-01 / D-05-03 / Pitfall 9 / Pitfall 11:
+    # Build a name-keyed scoring index map by exact NFC+casefold equality
+    # against the canonical display-form names from DEFAULT_TRAILER[:3].
+    # NEVER substring (`in`); NEVER `.lower()` or normalize_key for the trio
+    # match (only `_norm_for_match`); NEVER log here (D-05-07).
+    scoring_index_map: dict[str, int] = {}
+    missing_trio_names: list[str] = []
+    for canonical in DEFAULT_TRAILER[:3]:
+        canonical_norm = _norm_for_match(canonical)
+        idx = next(
+            (i for i, h in enumerate(trailer_raw) if _norm_for_match(h) == canonical_norm),
+            None,
+        )
+        if idx is not None:
+            scoring_index_map[canonical] = idx
+        else:
+            missing_trio_names.append(canonical)
+    return prefix_raw, dynamic, trailer_raw, scoring_index_map, tuple(missing_trio_names)
 
 
 TAG_HEADER_MAP = {
@@ -202,6 +229,7 @@ def build_row(
     trailer_cells_decoded: list[str],
     dynamic_headers_decoded: list[str],
     quiz_title: str,
+    scoring_index_map: dict[str, int],
 ) -> tuple[dict, list[str]]:
     """Build a single webhook-shaped row dict from already-decoded cells.
 
@@ -257,12 +285,16 @@ def build_row(
         row[f"question-{n}"] = header
         row[f"answers-{n}"] = shape_answer(cell)
         row[f"answers-tags-{n}"] = ", ".join(matched_buckets.get(i, []))
-    # Phase 3 D-01: pass-through scoring keys from trailer_cells_decoded[0..2].
-    # Bounds-checked so a short trailer (e.g. malformed row) emits "" rather
-    # than raising IndexError. D-03: empty cells emit "" verbatim, no WARNING.
-    row["result-logic"] = trailer_cells_decoded[0] if len(trailer_cells_decoded) > 0 else ""
-    row["score-category"] = trailer_cells_decoded[1] if len(trailer_cells_decoded) > 1 else ""
-    row["score-value"] = trailer_cells_decoded[2] if len(trailer_cells_decoded) > 2 else ""
+    # TRAIL-01 / D-05-04 / D-05-10 / Pitfall 10:
+    # Name-keyed scoring trio binding. The lookup index comes from
+    # scoring_index_map (built once in classify_headers via NFC+casefold).
+    # If a canonical trio column is absent from --trailer-columns, emit "".
+    # NEVER add a positional fallback to indices 0/1/2 — the empty-string
+    # branch is the ONLY behavior on a missing canonical name.
+    # D-03 / D-05-09 carry-forward: empty cell in present column stays silent.
+    row["result-logic"]   = trailer_cells_decoded[scoring_index_map["Result logic"]]   if "Result logic"   in scoring_index_map else ""
+    row["score-category"] = trailer_cells_decoded[scoring_index_map["Score category"]] if "Score category" in scoring_index_map else ""
+    row["score-value"]    = trailer_cells_decoded[scoring_index_map["Score value"]]    if "Score value"    in scoring_index_map else ""
     # Phase 3 D-02: 4 reserved placeholders, locked defaults. dict.update preserves
     # SCORING_PLACEHOLDERS' declared insertion order, which matches D-05's tail.
     row.update(SCORING_PLACEHOLDERS)
@@ -283,7 +315,7 @@ def dry_run(path: Path, trailer: tuple[str, ...] | None) -> int:
             logging.error("CSV is empty")
             return 1
         try:
-            _prefix, dynamic, _trailer_h = classify_headers(header, trailer)
+            _prefix, dynamic, _trailer_h, _scoring_map, _missing = classify_headers(header, trailer)
         except LayoutError as err:
             logging.error("%s", err)
             return 1
@@ -341,10 +373,23 @@ def convert(
             logging.error("CSV is empty")
             return 1
         try:
-            _prefix_h, dynamic_h, _trailer_h = classify_headers(header, trailer)
+            _prefix_h, dynamic_h, _trailer_h, scoring_index_map, missing_trio_names = classify_headers(
+                header, trailer
+            )
         except LayoutError as err:
             logging.error("%s", err)
             return 1
+
+        # D-05-08 (locked template) / T-PII-01 / TRAIL-02:
+        # Emit one PII-safe WARNING per missing canonical trio column.
+        # %r yields single-quoted form (e.g. 'Result logic'); the values are
+        # compile-time constants — NEVER row indices, NEVER cell content.
+        for name in missing_trio_names:
+            logging.warning(
+                "trailer column %r absent from CSV header; emitting empty string for %s in all rows",
+                name,
+                _OUTPUT_KEY_BY_CANONICAL[name],
+            )
 
         dynamic_headers_decoded = [decode_cell(h) for h in dynamic_h]
         expected_len = len(header)
@@ -366,7 +411,8 @@ def convert(
             dynamic_d = decoded[p_len : expected_len - t_len]
             trailer_d = decoded[expected_len - t_len :]
             row_dict, warnings_out = build_row(
-                prefix_d, dynamic_d, trailer_d, dynamic_headers_decoded, quiz_title
+                prefix_d, dynamic_d, trailer_d, dynamic_headers_decoded, quiz_title,
+                scoring_index_map,
             )
             for w in warnings_out:
                 # `w` is constructed in build_row from column names + categorical
