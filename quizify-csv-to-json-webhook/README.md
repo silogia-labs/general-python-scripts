@@ -62,11 +62,16 @@ whitespace is preserved verbatim.
 - **Trailer block (last 6 columns by default):** `Result logic`,
   `Score category`, `Score value`, `Answer tags`,
   `Time to complete (mm:ss)`, `Date`. Override with
-  `--trailer-columns "name1,name2,..."`. Note: scoring keys and `statusDate`
-  currently read trailer indices `0`, `1`, `2`, and `5` of the resolved
-  trailer; `--trailer-columns` overrides that change those positions will
-  misalign scoring fields. If you reorder the trailer, keep `Result logic`,
-  `Score category`, `Score value`, and `Date` in the default positions.
+  `--trailer-columns "name1,name2,..."`. The scoring trio
+  (`Result logic`, `Score category`, `Score value`) is bound to the
+  output keys `result-logic`, `score-category`, `score-value` by
+  canonical column name (NFC + casefold equality), so reordering those
+  three names within `--trailer-columns` is safe. If a canonical trio
+  column is omitted from `--trailer-columns` entirely, the
+  corresponding output key is emitted as `""` and a PII-safe stderr
+  `WARNING` names the absent column at startup. `Answer tags` and
+  `Date` continue to be read positionally (trailer indices 3 and 5);
+  keep those two in their default positions if you reorder the trailer.
 - **Dynamic question block (everything between):** mapped in header order to
   `question-1` … `question-K`. See
   [`docs/quizify-submissions.csv`](docs/quizify-submissions.csv) for the
@@ -126,10 +131,6 @@ the value if numeric semantics are required.
   downstream indexing.
 - `Score value` is string-typed (e.g., `"500"`, `"6"`); no numeric coercion
   is performed.
-- `--trailer-columns` overrides reorder the trailer block, but the
-  scoring/`statusDate` reads remain positional (indices `0..2` and `5`);
-  reorderings that move `Result logic`, `Score category`, `Score value`, or
-  `Date` away from default positions will misalign those fields silently.
 - Reserved placeholder keys (`product-recommendation`, `product-link-type`,
   `title`, `type-page-url`) emit `null` / `""` because the CSV cannot
   supply them.
