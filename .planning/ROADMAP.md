@@ -20,7 +20,7 @@
 
 **Milestone Goal:** Lock down the JSON contract between the Python CLI and the Make.com automation — fixing live correctness bugs in the JS consumer, hardening the Python trailer scoring lookup against mis-binding, and adding opt-in JSON Schema validation for CI fast-fail and AUTO-01 prereq.
 
-- [ ] **Phase 4: Make.com JS Contract Fixes** — Fix live correctness bugs in both JS modules and document the co-owned consumer surface
+- [x] **Phase 4: Make.com JS Contract Fixes** — Fix live correctness bugs in both JS modules and document the co-owned consumer surface (completed 2026-05-04)
 - [ ] **Phase 5: Python Trailer Hardening** — Replace positional trailer-cell indexing with name-based lookup; retire D-15
 - [ ] **Phase 6: JSON Schema Validation** — Add opt-in `--validate` flag backed by a formal JSON Schema Draft-07 artifact
 
@@ -40,7 +40,7 @@
   4. `quizify-csv-to-json-webhook/make-scripts/CONVENTIONS.md` exists and documents: tag canonical-spelling convention (snake_case underscores), CONTRACT-01 verification approach, MAKE-FIX-01 verification rows, MAKE-FIX-02 verification approach (MAKE-FIX-03 delivered).
 **Plans**: 2 plans
 - [x] 04-01-PLAN.md — Bundled JS edits: CONTRACT-01 deletion + MAKE-FIX-01 hyphen→underscore + MAKE-FIX-02 negation removal (Wave 1) — completed 2026-05-04
-- [ ] 04-02-PLAN.md — Create make-scripts/CONVENTIONS.md verification doc covering the four mandated topics (Wave 2; depends on 04-01)
+- [x] 04-02-PLAN.md — Create make-scripts/CONVENTIONS.md verification doc covering the four mandated topics (Wave 2; depends on 04-01)
 
 ### Phase 5: Python Trailer Hardening
 **Goal**: The scoring trio (`result-logic`, `score-category`, `score-value`) is extracted from CSV trailer cells by canonical column-name lookup — not positional index — so any valid `--trailer-columns` ordering produces correct scoring output and missing columns produce a PII-safe warning rather than silent mis-assignment.
@@ -74,6 +74,6 @@
 | 1. CSV ingestion & column layout | v1.0 | 1/1 | Complete | 2026-05-03 |
 | 2. Core webhook mapping | v1.0 | 2/2 | Complete | 2026-05-03 |
 | 3. Scoring metadata & packaging | v1.0 | 2/2 | Complete | 2026-05-03 |
-| 4. Make.com JS Contract Fixes | v1.1 | 1/2 | In progress | - |
+| 4. Make.com JS Contract Fixes | v1.1 | 2/2 | Complete   | 2026-05-04 |
 | 5. Python Trailer Hardening | v1.1 | 0/? | Not started | - |
 | 6. JSON Schema Validation | v1.1 | 0/? | Not started | - |
