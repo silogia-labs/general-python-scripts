@@ -39,7 +39,7 @@
   3. Running the Make.com scenario against a non-athlete respondent (sport_level not containing "alto") produces `activity_profile: "non_athlete"`; running against an athlete respondent produces `activity_profile: "athlete"` (MAKE-FIX-02 verified; inverted logic corrected).
   4. `quizify-csv-to-json-webhook/make-scripts/CONVENTIONS.md` exists and documents: tag canonical-spelling convention (snake_case underscores), CONTRACT-01 verification approach, MAKE-FIX-01 verification rows, MAKE-FIX-02 verification approach (MAKE-FIX-03 delivered).
 **Plans**: 2 plans
-- [ ] 04-01-PLAN.md — Bundled JS edits: CONTRACT-01 deletion + MAKE-FIX-01 hyphen→underscore + MAKE-FIX-02 negation removal (Wave 1)
+- [x] 04-01-PLAN.md — Bundled JS edits: CONTRACT-01 deletion + MAKE-FIX-01 hyphen→underscore + MAKE-FIX-02 negation removal (Wave 1) — completed 2026-05-04
 - [ ] 04-02-PLAN.md — Create make-scripts/CONVENTIONS.md verification doc covering the four mandated topics (Wave 2; depends on 04-01)
 
 ### Phase 5: Python Trailer Hardening
@@ -74,6 +74,6 @@
 | 1. CSV ingestion & column layout | v1.0 | 1/1 | Complete | 2026-05-03 |
 | 2. Core webhook mapping | v1.0 | 2/2 | Complete | 2026-05-03 |
 | 3. Scoring metadata & packaging | v1.0 | 2/2 | Complete | 2026-05-03 |
-| 4. Make.com JS Contract Fixes | v1.1 | 0/? | Not started | - |
+| 4. Make.com JS Contract Fixes | v1.1 | 1/2 | In progress | - |
 | 5. Python Trailer Hardening | v1.1 | 0/? | Not started | - |
 | 6. JSON Schema Validation | v1.1 | 0/? | Not started | - |
