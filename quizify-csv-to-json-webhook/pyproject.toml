@@ -1,0 +1,17 @@
+[project]
+name = "quizify-csv-to-json-webhook"
+version = "1.1.0"
+description = "Quizify CSV → webhook JSON CLI"
+requires-python = ">=3.9"
+readme = "README.md"
+license = { text = "MIT" }
+
+[project.optional-dependencies]
+validate = ["fastjsonschema>=2.21.2"]
+
+[build-system]
+requires = ["flit_core >=3.2,<4"]
+build-backend = "flit_core.buildapi"
+
+[tool.flit.module]
+name = "quizify_csv_ingest"
