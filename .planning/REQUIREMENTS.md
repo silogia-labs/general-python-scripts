@@ -30,7 +30,7 @@
 
 ### Documentation
 
-- [ ] **OPS-01**: Adds a concise README beside the script describing usage, column assumptions, and limitations (missing IDs, encoding).
+- [x] **OPS-01**: Adds a concise README beside the script describing usage, column assumptions, and limitations (missing IDs, encoding).
 
 ## v2 Requirements
 
@@ -65,7 +65,7 @@
 | WEB-03 | Phase 2 | Pending |
 | WEB-04 | Phase 3 | Complete |
 | WEB-05 | Phase 3 | Complete |
-| OPS-01 | Phase 3 | Pending |
+| OPS-01 | Phase 3 | Complete |
 
 **Coverage:**
 
