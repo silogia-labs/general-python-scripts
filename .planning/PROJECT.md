@@ -10,32 +10,41 @@ Each CSV submission row becomes one webhook-compatible JSON object with correct 
 
 ## Current State
 
-**Active: v1.1 Contract Hardening & Make.com Alignment (planning, started 2026-05-03)** — see Current Milestone section below.
+**Shipped: v1.1 Contract Hardening & Make.com Alignment (2026-05-04)** — see `.planning/MILESTONES.md` and `.planning/milestones/v1.1-ROADMAP.md`.
+**Shipped: v1.0 MVP (2026-05-03)** — see `.planning/milestones/v1.0-ROADMAP.md`.
 
-**Shipped: v1.0 MVP (2026-05-03)** — see `.planning/MILESTONES.md` and `.planning/milestones/v1.0-ROADMAP.md` for full details.
+**Planning next milestone (v1.2 — TBD).** Likely candidates surfaced from v1.1 deferred bucket: AUTO-01 (HTTP POST delivery, gated on VALI-01), STREAM-01 (NDJSON streaming for >50k-row CSVs), MAKE-COSMETIC-01/02 (Make.com JS housekeeping), MAKE-TEST-01 (Node test harness if `make-scripts/` LOC grows).
 
-- 71 tests passing (1.09s) across layout, row-builder, CLI emission, PII logging, golden-file structure, structural invariants, quiz-title precedence, and README/`--help` drift.
-- Stdlib-only runtime (Python 3.7+); pytest as the only dev dependency.
-- Single-file implementation: `quizify_csv_ingest.py` (427 lines) + 169-line operator README.
-- CLI surface: `csv_path` positional + `--dry-run`, `-v`/`--verbose`, `--trailer-columns`, `-o`/`--output`, `--emit-json`, `--quiz-title` (with `$QUIZIFY_QUIZ_TITLE` env fallback).
+- 94 tests passing (1.28s) across layout, row-builder, CLI emission, PII logging, golden-file structure, structural invariants, quiz-title precedence, README/`--help` drift, default-order regression (TRAIL-03), scoring-index-map binding (TRAIL-01/02), and schema validation (VALI-01..05) including PII-safe failure-stderr tests.
+- Runtime stays stdlib-only (D-13 preserved via lazy import); `fastjsonschema>=2.21.2` is an opt-in `[validate]` extra installable via `pip install '.[validate]'`.
+- Single-file implementation: `quizify_csv_ingest.py` + `pyproject.toml` (PEP 621 / flit_core); operator README extended with `--validate` documentation (D-11 ten-section lock preserved).
+- Co-owned consumer surface: `quizify-csv-to-json-webhook/make-scripts/` (`quizify-mapping.js`, `score-calculations.js`) + `make-scripts/CONVENTIONS.md`.
+- CLI surface: `csv_path` positional + `--dry-run`, `-v`/`--verbose`, `--trailer-columns`, `-o`/`--output`, `--emit-json`, `--quiz-title` (with `$QUIZIFY_QUIZ_TITLE` env fallback), `--validate` (opt-in JSON Schema gate).
+- Schema artifact: `quizify-csv-to-json-webhook/docs/webhook-schema.json` (Draft-07).
 
-## Current Milestone: v1.1 Contract Hardening & Make.com Alignment
+## Next Milestone Goals (v1.2 — TBD)
+
+Candidates surfaced from v1.1 close (defer/promote at next `/gsd-new-milestone`):
+
+- **AUTO-01** — HTTP POST delivery mode. v1.1 unblocked this by shipping VALI-01 (gates POSTs on schema validity).
+- **STREAM-01** — Streaming/NDJSON output for >50k-row CSVs (T-RESOURCE-01 carry-forward).
+- **MAKE-COSMETIC-01** — Fix `Reomoto` typo at `score-calculations.js:157`.
+- **MAKE-COSMETIC-02** — Remove dead `profile = "profile_base"` initializer at `score-calculations.js:217`.
+- **MAKE-TEST-01** — Introduce Node.js test harness for `make-scripts/` if/when JS files grow beyond ~500 LOC combined.
+
+<details>
+<summary>Previous Milestone Goal Section — v1.1 (shipped 2026-05-04)</summary>
 
 **Goal:** Lock down the JSON contract between the Python CLI and the Make.com automation by adding opt-in strict JSON Schema validation, eliminating positional mis-bind risk in trailer scoring, reconciling the field-name mismatch with `quizify-mapping.js`, and fixing two correctness bugs in the now-in-scope Make.com JS modules.
 
-**Target features:**
+**Target features (all shipped):**
 
-- **VALI-01** — Opt-in JSON Schema validation (default off; strict-when-enabled via `--validate` flag, exits non-zero on schema violation). Schema validates envelope structure (contact fields, locked tail order, presence of `question-N`/`answers-N`/`answers-tags-N` triples), not question text values.
-- **TRAIL-01** — Name-based scoring lookup for `--trailer-columns` (replaces positional `[0..2]`); preserves PII-safe stderr logging.
-- **CONTRACT-01** — Fix `quizify-mapping.js:102` to read `record["product-recommendation"]` (aligns with locked D-05 key order; resolves silent-null bug where Module 1 expected a key the CLI never emits).
-- **MAKE-FIX-01** — Reconcile peri-menopause tag mismatch between `quizify-mapping.js` (emits `peri_menu`) and `score-calculations.js` (checks `peri-menu`); fix inverted `activity_profile` condition at `score-calculations.js:247-250`.
+- **VALI-01** — Opt-in JSON Schema validation via `--validate` flag (✓ shipped Phase 6).
+- **TRAIL-01** — Name-based scoring lookup (✓ shipped Phase 5; D-15 retired).
+- **CONTRACT-01** — `quizify-mapping.js:102` reads `record["product-recommendation"]` (✓ shipped Phase 4).
+- **MAKE-FIX-01..03** — Peri-menopause tag canonicalization, `activity_profile` inversion fix, `make-scripts/CONVENTIONS.md` (✓ shipped Phase 4).
 
-**Deferred (post-v1.1):**
-
-- **AUTO-01** — HTTP POST delivery mode (v1.2 candidate; depends on VALI-01 being in place).
-- **STREAM-01** — Streaming/NDJSON output for >50k rows (T-RESOURCE-01).
-- Make.com JS cosmetic items (`Reomoto` typo at line 157, dead-code initialization at line 217).
-- Local JS test harness (deferred — manual verification only in v1.1).
+</details>
 
 ## Requirements
 
@@ -50,10 +59,22 @@ Each CSV submission row becomes one webhook-compatible JSON object with correct 
 - ✓ Scoring pass-through (`result-logic`/`score-category`/`score-value`) + 4 reserved placeholder keys — v1.0 (WEB-04)
 - ✓ `quiz_title` precedence (CLI > env > "") — v1.0 (WEB-05)
 - ✓ Operator README with automated `--help` drift test — v1.0 (OPS-01)
+- ✓ JS consumer reads the canonical hyphenated emit key — v1.1 (CONTRACT-01)
+- ✓ Peri-menopause tag canonical-spelling lock (`peri_menu` underscore on both sides) — v1.1 (MAKE-FIX-01)
+- ✓ `activity_profile` JS condition correctness — v1.1 (MAKE-FIX-02)
+- ✓ Manual verification protocol documented in `make-scripts/CONVENTIONS.md` (T-PII-01-safe synthetic fixtures) — v1.1 (MAKE-FIX-03)
+- ✓ Scoring trio bound by canonical column name (NFC+casefold), retiring D-15 — v1.1 (TRAIL-01)
+- ✓ Missing-trio-column → `""` + PII-safe WARNING (no positional fallback) — v1.1 (TRAIL-02)
+- ✓ Default-order callers see zero behavioral change (golden-fixture regression test) — v1.1 (TRAIL-03)
+- ✓ Hand-written Draft-07 schema covers contact, locked tail, and `question-N`/`answers-N`/`answers-tags-N` triple well-formedness without constraining text — v1.1 (VALI-03)
+- ✓ Opt-in `--validate` flag exits non-zero on violation with PII-safe JSON-Pointer-only stderr — v1.1 (VALI-01, VALI-02)
+- ✓ Default-off / zero-behavioral-change for unflagged callers — v1.1 (VALI-04, byte-identical stdout verified)
+- ✓ `fastjsonschema>=2.21.2` as `[validate]` optional extra; lazy import preserves D-13 stdlib-only-at-runtime; missing-extra path exits with locked D-06-19 verbatim message — v1.1 (VALI-05)
+- ✓ README documents `--validate` flag, install line, schema path; D-11 drift test (2/2) green — v1.1 (VALI-06)
 
 ### Active
 
-(See `.planning/REQUIREMENTS.md` for the canonical v1.1 REQ-ID list once written. v1.1 target categories: Schema Validation, Trailer Hardening, Contract Reconciliation, Make.com JS Fixes.)
+(None — awaiting `/gsd-new-milestone` for v1.2 requirements definition. Candidates carried forward in **Next Milestone Goals** section above.)
 
 ### Out of Scope
 
@@ -70,7 +91,7 @@ Each CSV submission row becomes one webhook-compatible JSON object with correct 
 - Target payload shape: `quizify-csv-to-json-webhook/docs/webhook-quizify-format-example.json`.
 - Representative export: `quizify-csv-to-json-webhook/docs/quizify-submissions.csv` (42 rows, 20 dynamic question columns).
 - CSV layout: 6 leading contact columns (`First name`, `Last name`, `Email`, `Phone`, `Subscribed to newsletter`, `Date`), a block of dynamic quiz question columns whose titles vary by quiz, then 6 trailing fields (`Result logic`, `Score category`, `Score value`, `Answer tags`, `Time to complete (mm:ss)`, `Date`).
-- Codebase: ~2,070 LOC Python (script + tests) + 169-line operator README, all under `quizify-csv-to-json-webhook/`. Stdlib-only at runtime.
+- Codebase: Python (script + tests) + operator README + Draft-07 schema artifact + `pyproject.toml` (PEP 621 / flit_core), all under `quizify-csv-to-json-webhook/`; co-owned `make-scripts/` (Make.com IIFE modules) on the consumer side. Stdlib-only at runtime by default; `pip install '.[validate]'` adds `fastjsonschema>=2.21.2` for the opt-in `--validate` gate (lazy-imported).
 - Peer scripts in the same repo (Confluence export, GitHub inventory, etc.) remain unrelated; reuse only general Python style conventions.
 - Threat-model carry-forward: T-PII-01 (PII-safe stderr logging — warnings name columns + categorical enum values only, never cell content; verified by negative substring assertions). Any new log surfaces in future milestones must preserve this contract.
 
@@ -121,4 +142,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-05-03 — v1.1 Contract Hardening milestone started (post v1.0 MVP)*
+*Last updated: 2026-05-04 after v1.1 Contract Hardening & Make.com Alignment milestone*

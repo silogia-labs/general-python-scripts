@@ -2,10 +2,10 @@
 gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Contract Hardening & Make.com Alignment
-status: completed
-stopped_at: Phase 6 context gathered
-last_updated: "2026-05-04T05:43:06.740Z"
-last_activity: 2026-05-04 -- Phase 6 marked complete
+status: shipped
+stopped_at: v1.1 milestone closed
+last_updated: "2026-05-04T05:50:45.171Z"
+last_activity: 2026-05-04 -- v1.1 milestone archived and tagged
 progress:
   total_phases: 3
   completed_phases: 3
@@ -18,25 +18,33 @@ progress:
 
 ## Project Reference
 
-See: `.planning/PROJECT.md` (updated 2026-05-03 after v1.0 milestone)
+See: `.planning/PROJECT.md` (updated 2026-05-04 after v1.1 milestone)
 
 **Core value:** Each CSV submission row becomes one webhook-compatible JSON object — without manual restructuring.
-**Current focus:** Phase 6 — json-schema-validation
+**Current focus:** Planning next milestone (v1.2 — TBD; run `/gsd-new-milestone`).
 
 ## Current Position
 
-Phase: 6 — COMPLETE
-Plan: 1 of 4
-Status: Phase 6 complete
-Last activity: 2026-05-04 -- Phase 6 marked complete
+Milestone: v1.1 — SHIPPED 2026-05-04 (tag `v1.1`).
+Status: Awaiting `/gsd-new-milestone` for v1.2 scope definition.
+Last activity: 2026-05-04 -- v1.1 milestone archived
 
 ## Performance Metrics
 
 **Velocity (v1.0):**
 
-- Total plans completed: 7
-- Timeline: 2026-05-03 (single-day milestone, init through phase 3 close)
+- Plans completed: 5
+- Timeline: 2026-05-03 (single-day milestone)
 - Files changed: 61 (+12,112 insertions)
+- Tests at close: 71
+
+**Velocity (v1.1):**
+
+- Plans completed: 9
+- Timeline: 2026-05-03 → 2026-05-04 (2-day milestone)
+- Files changed: 59 (+17,349 / −92)
+- Commits in v1.0..HEAD: 71
+- Tests at close: 94 (+23)
 
 ## Accumulated Context
 
@@ -44,20 +52,9 @@ Last activity: 2026-05-04 -- Phase 6 marked complete
 
 See `.planning/PROJECT.md` Key Decisions table for the consolidated v1.0 + v1.1 decision log.
 
-**v1.1 locked decisions (do not re-question):**
-
-- VALI-01 library: `fastjsonschema` 2.21.2 as optional extra (`pip install '.[validate]'`); lazy import; preserves D-13.
-- VALI-01 is opt-in / strict-when-enabled (default off).
-- Peri-menopause canonical tag: `peri_menu` (underscore). Fix is consumer side (`score-calculations.js:213`).
-- TRAIL-01 lookup: NFC+casefold equality (NOT substring). NO positional fallback.
-- `make-scripts/` is co-owned consumer surface as of v1.1.
-- Manual verification only for JS fixes — no Node test toolchain in v1.1.
-- D-11 README drift test will fail when `--validate` is added; expected — README update in same commit.
-- Sample CSV rows 10 and 35 have "Perimenopausia" — sufficient for MAKE-FIX-01 manual verification.
-
 ### Pending Todos
 
-None — awaiting `/gsd-plan-phase 4`.
+None — v1.1 closed.
 
 ### Blockers/Concerns
 
@@ -67,16 +64,15 @@ None open.
 
 | Category | Item | Status | Deferred At |
 |----------|------|--------|-------------|
-| feature | AUTO-01 (HTTP POST mode) | v1.2 candidate | 2026-05-03 |
+| feature | AUTO-01 (HTTP POST mode) | v1.2 candidate (unblocked by VALI-01 ship) | 2026-05-03 |
 | performance | STREAM-01 / T-RESOURCE-01 (streaming/NDJSON for >50k rows) | v1.2+ | 2026-05-03 |
-| testing | Local Node test harness for `make-scripts/` JS modules | v1.2+ | 2026-05-04 |
-| cosmetic | Make.com JS: `Reomoto` typo at `score-calculations.js:157` | v1.2+ | 2026-05-04 |
-| cosmetic | Make.com JS: dead-code `profile = "profile_base"` initializer at `score-calculations.js:217` | v1.2+ | 2026-05-04 |
+| testing | MAKE-TEST-01 (Node test harness for `make-scripts/`) | v1.2+ (gated on JS LOC growth >500) | 2026-05-04 |
+| cosmetic | MAKE-COSMETIC-01: `Reomoto` typo at `score-calculations.js:157` | v1.2+ | 2026-05-04 |
+| cosmetic | MAKE-COSMETIC-02: dead `profile = "profile_base"` init at `score-calculations.js:217` | v1.2+ | 2026-05-04 |
 
-**Activated in v1.1 (no longer deferred):** VALI-01 (now opt-in / strict-when-enabled), `--trailer-columns` name-based lookup (now TRAIL-01), CONTRACT-01 (new), MAKE-FIX-01..03 (new).
+**Shipped in v1.1 (no longer deferred):** VALI-01..06, TRAIL-01..03, CONTRACT-01, MAKE-FIX-01..03.
 
 ## Session Continuity
 
-Last session: 2026-05-04T04:32:20.806Z
-Stopped at: Phase 6 context gathered
-Resume file: .planning/phases/06-json-schema-validation/06-CONTEXT.md
+Last session: 2026-05-04 -- v1.1 milestone close
+Resume action: `/gsd-new-milestone` to define v1.2 scope.

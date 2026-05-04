@@ -4,26 +4,58 @@ History of shipped versions for the Quizify CSV → Webhook JSON initiative insi
 
 ---
 
-## Current Milestone: v1.1 Contract Hardening & Make.com Alignment (in progress)
+## v1.1 Contract Hardening & Make.com Alignment — 2026-05-04
 
-### Phase 5: Python Trailer Hardening — TRAIL-01 / TRAIL-02 / TRAIL-03 (shipped)
+**Delivered:** Locked the JSON contract end-to-end between the Python CLI and the Make.com automation pipeline. Three live Make.com correctness bugs fixed in the now-co-owned JS modules; positional trailer-cell scoring lookup retired in favor of NFC+casefold name-based binding (D-15 retired); opt-in JSON Schema Draft-07 validation shipped via a new `--validate` flag backed by `fastjsonschema` as an optional extra (runtime stays stdlib-only by default).
 
-**User-facing change (TRAIL-03 bugfix):** Operators passing
-`--trailer-columns` in a non-default order previously saw silently
-mis-bound scoring fields — `result-logic`, `score-category`, and
-`score-value` always read trailer cell positions `[0]`, `[1]`, `[2]`
-regardless of the canonical column name at that position. Phase 5 binds
-the scoring trio by canonical column name (NFC + casefold equality), so
-any valid `--trailer-columns` ordering produces correctly-bound output.
-Default-order callers see no behavioral change (verified by the
-`tests/test_default_order_regression.py` regression test against a v1.0
-output baseline). Missing trio columns emit an empty string for the
-corresponding output key plus a PII-safe stderr `WARNING` naming the
-absent canonical column.
+**User-facing change (TRAIL-03 bugfix):** Operators passing `--trailer-columns` in a non-default order previously saw silently mis-bound scoring fields — `result-logic`, `score-category`, and `score-value` always read trailer cell positions `[0]`, `[1]`, `[2]` regardless of the canonical column name at that position. Phase 5 binds the scoring trio by canonical column name, so any valid `--trailer-columns` ordering produces correctly-bound output. Default-order callers see no behavioral change (verified by `tests/test_default_order_regression.py` against a committed v1.0 golden fixture). Missing trio columns emit `""` plus a PII-safe stderr `WARNING` naming the absent canonical column.
 
-**Decisions retired:** D-15 (positional trailer indexing rationale) is
-retired in favor of name-based binding. The PROJECT.md Key Decisions
-table's D-15 row is updated to "Retired by TRAIL-01 (Phase 5, v1.1)".
+**Stats:**
+
+- Phases: 3 (Make.com JS Contract Fixes / Python Trailer Hardening / JSON Schema Validation)
+- Plans: 9 (all complete)
+- Tests at close: 94 passing in 1.28s (up from 71 at v1.0 close → +23 tests)
+- Files changed: 59 (+17,349 / −92)
+- Commits: 71 in v1.0..HEAD range
+- Timeline: 2026-05-03 → 2026-05-04 (2-day milestone)
+
+**Key accomplishments:**
+
+1. **Phase 4 — JS contract fixes (CONTRACT-01, MAKE-FIX-01..03):** Deleted `product_result` ghost line in `quizify-mapping.js`; replaced `peri-menu` → `peri_menu` (underscore canon) at `score-calculations.js:213` so the `peri_menopause_menopause` life-stage classification fires; removed `!` negation in `activity_profile` so the entire respondent population stops being mis-classified; new `make-scripts/CONVENTIONS.md` documents tag canonical-spelling, CONTRACT-01 verification via synthetic inline-JSON fixture (T-PII-01 preserved), and the row-10/row-35 references for MAKE-FIX-01.
+2. **Phase 5 — Trailer hardening (TRAIL-01, TRAIL-02):** Refactored `classify_headers` to a 5-tuple returning `(prefix, dynamic, trailer_raw, scoring_index_map, missing_trio_names)`; rewrote `build_row` to bind the scoring trio by NFC+casefold canonical-name lookup against `scoring_index_map`; emits `""` plus a PII-safe `logging.warning("missing canonical scoring trio column: %r", canonical_name)` for absent columns (D-05-08 locked template). 14 `test_row_builder` call sites synchronized; new `TestScoringIndexMap` / `TestScrambledTrailer` / `TestMissingColumnWarning` classes added.
+3. **Phase 5 — Default-order regression lock (TRAIL-03):** New `tests/test_default_order_regression.py` replays the CLI against `docs/quizify-submissions.csv` and structurally compares against a committed v1.0 golden fixture (`tests/fixtures/v1.0_default_order_output.json`) — proves zero behavioral change for unflagged callers. Operator README updated to remove "scoring stays positional" caveats; `D-15` row in PROJECT.md Key Decisions table marked retired.
+4. **Phase 6 — Schema artifact + packaging (VALI-03, VALI-05):** Hand-written Draft-07 schema at `quizify-csv-to-json-webhook/docs/webhook-schema.json` covers contact fields by name+type, locked D-05 tail-key presence via `required`, and `question-N`/`answers-N`/`answers-tags-N` triple well-formedness via `patternProperties` (without constraining question text values). `pyproject.toml` adds minimal flit_core PEP 621 metadata with `validate = ["fastjsonschema>=2.21.2"]` as an optional extra; `[project.dependencies]` stays empty (D-13 stdlib-only-at-runtime preserved via lazy import inside the validation helper).
+5. **Phase 6 — `--validate` flag end-to-end (VALI-01, VALI-02, VALI-04):** New `--validate` argparse flag (default off, opt-in only); `_run_schema_validation` lazy-imports fastjsonschema and compiles the schema once per invocation; `_format_validation_error` produces categorical-only PII-safe stderr output identifying the JSON Pointer path (no cell content leaked); `--validate` exits 0 on the bundled 42-row sample with byte-identical stdout to default invocation; missing-extra path exits 1 with locked D-06-19 verbatim message and no traceback. 11 new tests across `TestSamplePasses` / `TestValidationFailurePIIsafe` / `TestMissingExtra` (3 PII-safe tests with synthetic-fixture mutation).
+6. **Phase 6 — README documentation lock (VALI-06):** Operator README extended (within D-11 ten-section lock) to document the `--validate` CLI flag, the `pip install '.[validate]'` extra installation step, and the schema file path. `tests/test_readme_help_alignment.py` (D-11 drift test, 2/2) green after additions.
+
+**Cross-phase integration verified** (per `.planning/v1.1-INTEGRATION-CHECK.md` and milestone audit):
+
+- P5→P6 emit/schema alignment: schema accepts `""` on trio fields (TRAIL-02 fallback); live `--validate` against 42-row sample exits 0 with 140,665 bytes byte-identical to default.
+- P5→P4 hyphen-key contract: Python emits `record["product-recommendation"]`-style hyphenated keys; JS reads same at `quizify-mapping.js:102`.
+- P4↔P5 tag spelling: `peri_menu` underscore matches across `score-calculations.js:213` and `quizify-mapping.js:166`.
+
+**Deferred to v1.2+** (tracked in archived REQUIREMENTS.md and PROJECT.md):
+
+- AUTO-01 — HTTP POST delivery (gates on VALI-01 success)
+- STREAM-01 — NDJSON / streaming output for >50k-row CSVs
+- MAKE-COSMETIC-01 — `Reomoto` typo at `score-calculations.js:157`
+- MAKE-COSMETIC-02 — dead `profile = "profile_base"` initializer at `score-calculations.js:217`
+- MAKE-TEST-01 — Node.js test harness for `make-scripts/` (gated on JS LOC growth)
+
+**Decisions retired:**
+
+- **D-15** (positional trailer indexing rationale) — retired by TRAIL-01 in favor of NFC+casefold name-based binding. PROJECT.md Key Decisions D-15 row updated.
+
+**Audit:** ✓ passed (`.planning/milestones/v1.1-MILESTONE-AUDIT.md`) — 13/13 requirements satisfied, cross-phase integration clean, all E2E flows green. Tech debt is administrative-only (stale draft markers in two VALIDATION.md frontmatters; coverage is real).
+
+**Archived:**
+
+- `.planning/milestones/v1.1-ROADMAP.md` — full phase details + success criteria + decisions
+- `.planning/milestones/v1.1-REQUIREMENTS.md` — 13/13 v1.1 requirements with shipped outcomes
+- `.planning/milestones/v1.1-MILESTONE-AUDIT.md` — passed audit
+- `.planning/milestones/v1.1-phases/` — raw execution history (CONTEXT, RESEARCH, PLAN, VALIDATION, SUMMARY, VERIFICATION per phase)
+
+**Tag:** `v1.1`
 
 ---
 
