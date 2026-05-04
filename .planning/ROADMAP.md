@@ -22,7 +22,7 @@
 
 - [x] **Phase 4: Make.com JS Contract Fixes** — Fix live correctness bugs in both JS modules and document the co-owned consumer surface (completed 2026-05-04)
 - [x] **Phase 5: Python Trailer Hardening** — Replace positional trailer-cell indexing with name-based lookup; retire D-15 (completed 2026-05-04)
-- [ ] **Phase 6: JSON Schema Validation** — Add opt-in `--validate` flag backed by a formal JSON Schema Draft-07 artifact
+- [x] **Phase 6: JSON Schema Validation** — Add opt-in `--validate` flag backed by a formal JSON Schema Draft-07 artifact (completed 2026-05-04)
 
 ## Phase Details
 
@@ -83,4 +83,4 @@
 | 3. Scoring metadata & packaging | v1.0 | 2/2 | Complete | 2026-05-03 |
 | 4. Make.com JS Contract Fixes | v1.1 | 2/2 | Complete    | 2026-05-04 |
 | 5. Python Trailer Hardening | v1.1 | 3/3 | Complete   | 2026-05-04 |
-| 6. JSON Schema Validation | v1.1 | 0/4 | Planned | - |
+| 6. JSON Schema Validation | v1.1 | 4/4 | Complete | 2026-05-04 |
