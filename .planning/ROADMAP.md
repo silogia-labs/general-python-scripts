@@ -38,7 +38,9 @@
   2. Running the Make.com scenario against sample rows 10 (Karen Retamal) and 35 (Javielys Mancilla) — both have `Perimenopausia` in `menopause_status` — produces output where `is_peri_meno` is `true` and `life_stage` includes `peri_menopause_menopause` (MAKE-FIX-01 verified).
   3. Running the Make.com scenario against a non-athlete respondent (sport_level not containing "alto") produces `activity_profile: "non_athlete"`; running against an athlete respondent produces `activity_profile: "athlete"` (MAKE-FIX-02 verified; inverted logic corrected).
   4. `quizify-csv-to-json-webhook/make-scripts/CONVENTIONS.md` exists and documents: tag canonical-spelling convention (snake_case underscores), CONTRACT-01 verification approach, MAKE-FIX-01 verification rows, MAKE-FIX-02 verification approach (MAKE-FIX-03 delivered).
-**Plans**: TBD
+**Plans**: 2 plans
+- [ ] 04-01-PLAN.md — Bundled JS edits: CONTRACT-01 deletion + MAKE-FIX-01 hyphen→underscore + MAKE-FIX-02 negation removal (Wave 1)
+- [ ] 04-02-PLAN.md — Create make-scripts/CONVENTIONS.md verification doc covering the four mandated topics (Wave 2; depends on 04-01)
 
 ### Phase 5: Python Trailer Hardening
 **Goal**: The scoring trio (`result-logic`, `score-category`, `score-value`) is extracted from CSV trailer cells by canonical column-name lookup — not positional index — so any valid `--trailer-columns` ordering produces correct scoring output and missing columns produce a PII-safe warning rather than silent mis-assignment.
