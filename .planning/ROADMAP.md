@@ -69,10 +69,10 @@
   4. `quizify-csv-to-json-webhook/docs/webhook-schema.json` (or `schema/quizify-webhook.schema.json`) exists, passes JSON Schema Draft-07 self-validation, and covers: all contact fields by name and type, locked D-05 tail-key presence via `required`, and `question-N`/`answers-N`/`answers-tags-N` triple well-formedness via `patternProperties` — without constraining question text values (VALI-03 verified).
   5. The operator README documents the `--validate` flag, the `[validate]` optional extra installation step, and the schema file path; `test_readme_help_alignment.py` passes after the additions (VALI-06 verified; D-11 drift test satisfied).
 **Plans**: 4 plans
-- [ ] 06-01-PLAN.md — Wave 0: Draft-07 schema artifact + test scaffold w/ TestSchemaSelfValidation (VALI-03; TDD)
-- [ ] 06-02-PLAN.md — Wave 0: pyproject.toml with [validate] optional extra (VALI-05 packaging)
-- [ ] 06-03-PLAN.md — Wave 1: --validate argparse flag + _run_schema_validation helper + 3 test classes (VALI-01/02/04/05; TDD; depends on 06-01, 06-02)
-- [ ] 06-04-PLAN.md — Wave 2: README extensions + PROJECT.md decision-log update (VALI-06; depends on 06-03)
+- [x] 06-01-PLAN.md — Wave 0: Draft-07 schema artifact + test scaffold w/ TestSchemaSelfValidation (VALI-03; TDD)
+- [x] 06-02-PLAN.md — Wave 0: pyproject.toml with [validate] optional extra (VALI-05 packaging)
+- [x] 06-03-PLAN.md — Wave 1: --validate argparse flag + _run_schema_validation helper + 3 test classes (VALI-01/02/04/05; TDD; depends on 06-01, 06-02)
+- [x] 06-04-PLAN.md — Wave 2: README extensions + PROJECT.md decision-log update (VALI-06; depends on 06-03)
 
 ## Progress
 
