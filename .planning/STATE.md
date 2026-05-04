@@ -1,17 +1,16 @@
 ---
 gsd_state_version: 1.0
-milestone: v1.0
-milestone_name: MVP
-status: shipped
-stopped_at: v1.0 milestone shipped 2026-05-03
-last_updated: "2026-05-03T00:00:00.000Z"
-last_activity: 2026-05-03
+milestone: v1.1
+milestone_name: Contract Hardening
+status: planning
+last_updated: "2026-05-04T01:20:42.742Z"
+last_activity: 2026-05-04
 progress:
-  total_phases: 3
-  completed_phases: 3
-  total_plans: 5
-  completed_plans: 5
-  percent: 100
+  total_phases: 0
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
+  percent: 0
 ---
 
 # Project State
@@ -21,17 +20,14 @@ progress:
 See: `.planning/PROJECT.md` (updated 2026-05-03 after v1.0 milestone)
 
 **Core value:** Each CSV submission row becomes one webhook-compatible JSON object — without manual restructuring.
-**Current focus:** v1.0 shipped. Run `/gsd-new-milestone` to scope v1.1 (AUTO-01 / VALI-01 / streaming / `--trailer-columns` hardening).
+**Current focus:** v1.1 Contract Hardening — opt-in JSON Schema validation (VALI-01), trailer name-based lookup (TRAIL-01), CONTRACT-01 field-name reconciliation in `quizify-mapping.js`, and Make.com JS bug fixes (peri-menu tag mismatch + inverted is_athlete). Defining requirements next.
 
 ## Current Position
 
-Milestone: v1.0 MVP — SHIPPED 2026-05-03
-Phases: 3/3 complete
-Plans: 5/5 complete
-Tests: 71 passing (1.09s)
-Tag: v1.0
-
-Progress: [██████████] 100%
+Phase: Not started (defining requirements)
+Plan: —
+Status: Defining requirements
+Last activity: 2026-05-04 — Milestone v1.1 started
 
 ## Performance Metrics
 
@@ -59,13 +55,16 @@ None open.
 
 | Category | Item | Status | Deferred At |
 |----------|------|--------|-------------|
-| feature | AUTO-01 (HTTP POST mode) | v2 | 2026-05-03 |
-| feature | VALI-01 (JSON Schema validation) | v2 | 2026-05-03 |
-| performance | T-RESOURCE-01 (streaming/NDJSON for >50k rows) | v2 | 2026-05-03 |
-| robustness | `--trailer-columns` name-based scoring lookup | v2 | 2026-05-03 |
+| feature | AUTO-01 (HTTP POST mode) | v1.2 candidate | 2026-05-03 |
+| performance | STREAM-01 / T-RESOURCE-01 (streaming/NDJSON for >50k rows) | v1.2+ | 2026-05-03 |
+| testing | Local Node test harness for `make-scripts/` JS modules | v1.2+ | 2026-05-04 |
+| cosmetic | Make.com JS: `Reomoto` typo at `score-calculations.js:157` | v1.2+ | 2026-05-04 |
+| cosmetic | Make.com JS: dead-code `profile = "profile_base"` initializer at `score-calculations.js:217` | v1.2+ | 2026-05-04 |
+
+**Activated in v1.1 (no longer deferred):** VALI-01 (now opt-in / strict-when-enabled), `--trailer-columns` name-based lookup (now TRAIL-01), CONTRACT-01 (new), MAKE-FIX-01 (new — peri-menu tag mismatch + inverted is_athlete).
 
 ## Session Continuity
 
-Last session: 2026-05-03 (v1.0 milestone close)
-Stopped at: v1.0 milestone shipped 2026-05-03
-Resume file: `.planning/MILESTONES.md`
+Last session: 2026-05-04 (v1.1 milestone start, planning)
+Stopped at: gathering requirements for v1.1
+Resume file: `.planning/PROJECT.md` (Current Milestone section)
