@@ -6,6 +6,7 @@ Covers D-01..D-14 and CONV-03..06 / WEB-01..03.
 from __future__ import annotations
 
 import json
+import logging
 
 import pytest
 
@@ -344,3 +345,111 @@ def test_key_order_matches_d05() -> None:
         "title",
         "type-page-url",
     ]
+
+
+class TestScrambledTrailer:
+    """TRAIL-01: build_row binds scoring trio by named index, not positional.
+
+    A reversed scoring_index_map proves the binding is name-keyed: if the
+    implementation regressed to positional reads, the values would swap.
+    """
+
+    def test_scrambled_order_binds_correctly(
+        self, scoring_index_map_default
+    ) -> None:
+        # Reversed index map: "Result logic" reads cell 2, "Score value" reads cell 0
+        reversed_map = {"Result logic": 2, "Score category": 1, "Score value": 0}
+        prefix_d, dyn_d, _trailer_default, headers_d = _minimal_decoded_inputs()
+        # trailer cells: [VAL, CAT, LOG, "", "00:30", "2024-01-15"] — note positions 0/1/2
+        trailer_d = ["VAL", "CAT", "LOG", "", "00:30", "2024-01-15"]
+        row, _ = build_row(
+            prefix_d, dyn_d, trailer_d, headers_d,
+            quiz_title="", scoring_index_map=reversed_map,
+        )
+        # Named lookup → "Result logic" reads cell 2 == "LOG", not cell 0 == "VAL"
+        assert row["result-logic"] == "LOG"
+        assert row["score-category"] == "CAT"
+        assert row["score-value"] == "VAL"
+
+
+class TestMissingColumnWarning:
+    """TRAIL-02 + T-PII-01: missing canonical trio column → empty string + PII-safe WARNING.
+
+    Verifies D-05-08 (locked warning template), D-05-09 (no positional fallback),
+    D-05-10 (Pitfall 10), and T-PII-01 (no cell content / no PII tokens).
+    """
+
+    def test_missing_column_emits_empty_string(self) -> None:
+        # "Result logic" deliberately omitted from the index map
+        partial_map = {"Score category": 1, "Score value": 2}
+        prefix_d, dyn_d, _trailer_default, headers_d = _minimal_decoded_inputs()
+        trailer_d = ["IGNORED_AT_0", "CAT", "VAL", "", "00:30", "2024-01-15"]
+        row, _ = build_row(
+            prefix_d, dyn_d, trailer_d, headers_d,
+            quiz_title="", scoring_index_map=partial_map,
+        )
+        # NO positional fallback to trailer_d[0] — must be "" (D-05-10 / Pitfall 10)
+        assert row["result-logic"] == ""
+        assert row["score-category"] == "CAT"
+        assert row["score-value"] == "VAL"
+
+    def test_warning_message_matches_locked_template(self, tmp_path, caplog) -> None:
+        # Build a 1-row CSV whose --trailer-columns omits "Result logic"
+        import csv as _csv
+        from quizify_csv_ingest import CONTACT_PREFIX, convert
+        csv_path = tmp_path / "missing_result_logic.csv"
+        custom_trailer = (
+            "Score category", "Score value", "Answer tags",
+            "Time to complete (mm:ss)", "Date",
+        )
+        header = list(CONTACT_PREFIX) + ["q1"] + list(custom_trailer)
+        row = [
+            "First", "Last", "x@example.com", "Yes", "555-0100", "Yes",
+            "Q1 cell",
+            "cat", "100", "tag1", "00:30", "2024-01-15",
+        ]
+        with csv_path.open("w", encoding="utf-8", newline="") as f:
+            w = _csv.writer(f)
+            w.writerow(header)
+            w.writerow(row)
+        with caplog.at_level(logging.WARNING):
+            rc = convert(csv_path, custom_trailer, output=tmp_path / "out.json", quiz_title="")
+        assert rc == 0
+        matches = [
+            r for r in caplog.records
+            if "absent from CSV header" in r.getMessage()
+            and "'Result logic'" in r.getMessage()
+            and "result-logic in all rows" in r.getMessage()
+        ]
+        assert len(matches) == 1, [r.getMessage() for r in caplog.records]
+
+    def test_warning_pii_safe(self, tmp_path, caplog) -> None:
+        # Same fixture as above — confirm the warning message contains no PII tokens
+        import csv as _csv
+        from quizify_csv_ingest import CONTACT_PREFIX, convert
+        csv_path = tmp_path / "pii_check.csv"
+        custom_trailer = (
+            "Score category", "Score value", "Answer tags",
+            "Time to complete (mm:ss)", "Date",
+        )
+        header = list(CONTACT_PREFIX) + ["q1"] + list(custom_trailer)
+        row = [
+            "PIINAME", "LASTPII", "leak@example.com", "Yes", "+15550100", "Yes",
+            "PIIANSWER",
+            "cat", "100", "tag1", "00:30", "2024-01-15",
+        ]
+        with csv_path.open("w", encoding="utf-8", newline="") as f:
+            w = _csv.writer(f)
+            w.writerow(header)
+            w.writerow(row)
+        with caplog.at_level(logging.WARNING):
+            convert(csv_path, custom_trailer, output=tmp_path / "out.json", quiz_title="")
+        matches = [r for r in caplog.records if "absent from CSV header" in r.getMessage()]
+        assert len(matches) >= 1
+        msg = matches[0].getMessage()
+        assert "@" not in msg
+        assert "+" not in msg
+        assert "leak" not in msg
+        assert "PIINAME" not in msg
+        assert "LASTPII" not in msg
+        assert "PIIANSWER" not in msg
