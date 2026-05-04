@@ -102,3 +102,16 @@ def multi_select_synthetic_row() -> dict:
     dynamic = ["A, B, C"] + [""] * 19
     trailer = ["", "", "", "", "00:30", "2026-05-01"]
     return {"prefix": prefix, "dynamic": dynamic, "trailer": trailer}
+
+
+@pytest.fixture
+def scoring_index_map_default() -> dict[str, int]:
+    """Default-order scoring index map matching DEFAULT_TRAILER[:3] positions.
+
+    Used by every test_row_builder.py call site that previously omitted the
+    scoring map (post-Phase-5, build_row requires it as the 6th arg).
+
+    Per D-05-06: keys are display-form canonical names from DEFAULT_TRAILER;
+    values are positional indices into a default-order trailer.
+    """
+    return {"Result logic": 0, "Score category": 1, "Score value": 2}
