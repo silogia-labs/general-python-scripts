@@ -21,7 +21,17 @@ python quizify_csv_ingest.py docs/quizify-submissions.csv --quiz-title "Autoeval
 
 Run from `quizify-csv-to-json-webhook/`. Sample input:
 [`docs/quizify-submissions.csv`](docs/quizify-submissions.csv); target shape:
-[`docs/webhook-quizify-format-example.json`](docs/webhook-quizify-format-example.json).
+[`docs/webhook-quizify-format-example.json`](docs/webhook-quizify-format-example.json);
+formal contract: [`docs/webhook-schema.json`](docs/webhook-schema.json).
+
+Optional — enable schema validation:
+
+```bash
+cd quizify-csv-to-json-webhook
+pip install '.[validate]'
+```
+
+The `[validate]` extra installs `fastjsonschema` so the `--validate` flag can check the emitted JSON against [`docs/webhook-schema.json`](docs/webhook-schema.json). Default invocations remain stdlib-only.
 
 ## CLI reference
 
@@ -36,6 +46,7 @@ Run from `quizify-csv-to-json-webhook/`. Sample input:
 | `-o`, `--output PATH` | stdout | Write JSON array to PATH (UTF-8). | — |
 | `--emit-json` | off | Explicit JSON emission; redundant with default behavior. | — |
 | `--quiz-title VALUE` | `""` | Quiz title; decoded via `html.unescape`; whitespace preserved. | `QUIZIFY_QUIZ_TITLE` |
+| `--validate` | off | Validate emitted JSON against `docs/webhook-schema.json` (requires `[validate]` extra). Validation runs only when JSON output is produced; `--dry-run` skips it. | — |
 
 ## Configuration
 
