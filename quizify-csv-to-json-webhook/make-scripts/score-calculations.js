@@ -245,7 +245,7 @@ if (is_postpartum) {
 
 // Activity profile (simple)
 let activity_profile = "non_athlete";
-if (!data.is_athlete) {
+if (data.is_athlete) {
     activity_profile = "athlete";
 }
 
