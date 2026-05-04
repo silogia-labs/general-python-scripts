@@ -121,6 +121,8 @@ SCORING_PLACEHOLDERS = {
     "type-page-url": "",
 }
 
+SCHEMA_PATH = Path(__file__).resolve().parent / "docs" / "webhook-schema.json"
+
 
 def decode_cell(s: str) -> str:
     """Decode HTML entities in a CSV cell (CONV-06, D-14). Identity on empty."""
@@ -339,11 +341,81 @@ def dry_run(path: Path, trailer: tuple[str, ...] | None) -> int:
     return 0
 
 
+def _format_validation_error(err) -> str:
+    """Format a fastjsonschema.JsonSchemaValueException → D-06-20 PII-safe stderr.
+
+    Uses ONLY categorical attributes — NEVER `err.message` / `err.value` / `str(err)`,
+    which echo cell content (Pitfall 17, T-PII-01).
+
+    Categorical inputs:
+      err.path          : list[str], starts with literal 'data' (validator's own
+                          variable name; not user data — RESEARCH Assumption A2).
+      err.definition    : dict, the failing schema clause (categorical types).
+      type(err.value)   : Python type — yields 'str'/'int'/'NoneType'/'list'/'dict'.
+    """
+    pointer = "/" + "/".join(err.path[1:]) if len(err.path) > 1 else "/"
+    expected = (err.definition or {}).get("type", "<unknown>")
+    if isinstance(expected, list):  # union type, e.g. ["string", "null"]
+        expected = "|".join(expected)
+    actual = type(err.value).__name__
+    return f"ERROR schema validation failed at {pointer}: expected {expected}, got {actual}"
+
+
+def _run_schema_validation(rows: list[dict], schema_path: Path) -> int:
+    """Validate `rows` against the Draft-07 schema at `schema_path`.
+
+    Returns 0 on success, 1 on any failure (D-06-21).
+
+    Discipline (locked):
+      - Lazy `import fastjsonschema` inside the body (D-06-17, Pitfall 18) so the
+        default CLI path (no --validate) never loads the optional dependency,
+        preserving D-13 stdlib-only-at-runtime.
+      - `fastjsonschema.compile()` exactly once per invocation (D-06-18, Pitfall 19).
+      - On schema violation, format stderr via `_format_validation_error` —
+        categorical-only (T-PII-01, Pitfall 17). Never `.message`, never `.value`.
+      - On missing extra, print exact D-06-19 template — no traceback.
+      - On schema-authoring bug (JsonSchemaDefinitionException), print categorical
+        message — schema dict is repo-controlled (no PII risk).
+    """
+    try:
+        # Lazy import: only loaded under --validate (D-06-17, Pitfall 18)
+        import fastjsonschema
+    except ImportError:
+        print(
+            "ERROR --validate requires fastjsonschema; install with: pip install '.[validate]'",
+            file=sys.stderr,
+        )
+        return 1
+
+    try:
+        schema = json.loads(schema_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as err:
+        # Categorical: schema file is repo-controlled.
+        print(f"ERROR could not load schema {schema_path.name}: {type(err).__name__}", file=sys.stderr)
+        return 1
+
+    try:
+        validator = fastjsonschema.compile(schema)
+    except fastjsonschema.JsonSchemaDefinitionException as err:
+        # Categorical: schema dict is repo-controlled — no row data.
+        print(f"ERROR schema definition invalid: {err}", file=sys.stderr)
+        return 1
+
+    try:
+        validator(rows)  # root is `array` → single call validates all rows
+    except fastjsonschema.JsonSchemaValueException as err:
+        print(_format_validation_error(err), file=sys.stderr)
+        return 1
+
+    return 0
+
+
 def convert(
     path: Path,
     trailer: tuple[str, ...] | None,
     output: Path | None,
     quiz_title: str,
+    validate: bool = False,
 ) -> int:
     """Phase 2 main path: CSV → list[dict] → JSON array on stdout or to file.
 
@@ -420,6 +492,11 @@ def convert(
                 logging.warning("row %d %s", idx, w)
             results.append(row_dict)
 
+    if validate:
+        rc = _run_schema_validation(results, SCHEMA_PATH)
+        if rc != 0:
+            return rc
+
     if output is None:
         json.dump(results, sys.stdout, indent=2, ensure_ascii=False)
         sys.stdout.write("\n")
@@ -445,6 +522,11 @@ def main(argv: list[str] | None = None) -> int:
         help="Explicit JSON emission flag (default behavior; accepted for self-documenting scripts).",
     )
     parser.add_argument(
+        "--validate",
+        action="store_true",
+        help="Validate emitted JSON against docs/webhook-schema.json (requires '[validate]' extra).",
+    )
+    parser.add_argument(
         "--quiz-title",
         default=None,
         help='Quiz title; falls back to $QUIZIFY_QUIZ_TITLE env var, then "". Decoded via html.unescape.',
@@ -466,7 +548,7 @@ def main(argv: list[str] | None = None) -> int:
     if args.dry_run:
         return dry_run(args.csv_path, trailer_override)
 
-    return convert(args.csv_path, trailer_override, args.output, quiz_title)
+    return convert(args.csv_path, trailer_override, args.output, quiz_title, validate=args.validate)
 
 
 if __name__ == "__main__":
