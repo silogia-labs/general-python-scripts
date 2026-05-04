@@ -53,7 +53,7 @@
   3. Running the CLI against a CSV where a canonical trailer column is absent causes the CLI to emit an empty string for that field and log a PII-safe WARNING naming the missing column — no positional fallback occurs (TRAIL-02 verified).
   4. The 71 existing tests continue to pass after the change; the new name-based lookup tests are green.
 **Plans**: 3 plans
-- [ ] 05-01-PLAN.md — Wave 0 preconditions: scoring_index_map_default conftest fixture + v1.0 default-order golden output JSON (Pitfall G)
+- [x] 05-01-PLAN.md — Wave 0 preconditions: scoring_index_map_default conftest fixture + v1.0 default-order golden output JSON (Pitfall G)
 - [ ] 05-02-PLAN.md — TDD: name-based scoring trio binding (TRAIL-01) + missing-column PII-safe WARNING (TRAIL-02); classify_headers 5-tuple, build_row signature change, convert warning loop, 14 test_row_builder call-site updates, TestScoringIndexMap/TestScrambledTrailer/TestMissingColumnWarning classes
 - [ ] 05-03-PLAN.md — TRAIL-03 default-order regression test vs v1.0 golden + README/MILESTONES updates (Pitfall F: remove 'scoring stays positional' caveats)
 
@@ -78,5 +78,5 @@
 | 2. Core webhook mapping | v1.0 | 2/2 | Complete | 2026-05-03 |
 | 3. Scoring metadata & packaging | v1.0 | 2/2 | Complete | 2026-05-03 |
 | 4. Make.com JS Contract Fixes | v1.1 | 2/2 | Complete    | 2026-05-04 |
-| 5. Python Trailer Hardening | v1.1 | 0/3 | Not started | - |
+| 5. Python Trailer Hardening | v1.1 | 1/3 | In Progress|  |
 | 6. JSON Schema Validation | v1.1 | 0/? | Not started | - |
