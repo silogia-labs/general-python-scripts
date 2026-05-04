@@ -4,6 +4,29 @@ History of shipped versions for the Quizify CSV → Webhook JSON initiative insi
 
 ---
 
+## Current Milestone: v1.1 Contract Hardening & Make.com Alignment (in progress)
+
+### Phase 5: Python Trailer Hardening — TRAIL-01 / TRAIL-02 / TRAIL-03 (shipped)
+
+**User-facing change (TRAIL-03 bugfix):** Operators passing
+`--trailer-columns` in a non-default order previously saw silently
+mis-bound scoring fields — `result-logic`, `score-category`, and
+`score-value` always read trailer cell positions `[0]`, `[1]`, `[2]`
+regardless of the canonical column name at that position. Phase 5 binds
+the scoring trio by canonical column name (NFC + casefold equality), so
+any valid `--trailer-columns` ordering produces correctly-bound output.
+Default-order callers see no behavioral change (verified by the
+`tests/test_default_order_regression.py` regression test against a v1.0
+output baseline). Missing trio columns emit an empty string for the
+corresponding output key plus a PII-safe stderr `WARNING` naming the
+absent canonical column.
+
+**Decisions retired:** D-15 (positional trailer indexing rationale) is
+retired in favor of name-based binding. The PROJECT.md Key Decisions
+table's D-15 row is updated to "Retired by TRAIL-01 (Phase 5, v1.1)".
+
+---
+
 ## v1.0 MVP — 2026-05-03
 
 **Delivered:** A stdlib-only Python CLI (`quizify-csv-to-json-webhook/quizify_csv_ingest.py`) that converts Quizify.io CSV exports into webhook-shaped JSON arrays, with deterministic column classification, PII-safe stderr logging, scoring metadata pass-through, `--quiz-title` precedence handling, and an operator README guarded by an automated `--help` drift smoke test.
