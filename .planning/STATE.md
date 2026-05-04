@@ -6,7 +6,7 @@ status: planning
 last_updated: "2026-05-04T01:20:42.742Z"
 last_activity: 2026-05-04
 progress:
-  total_phases: 0
+  total_phases: 3
   completed_phases: 0
   total_plans: 0
   completed_plans: 0
@@ -20,14 +20,14 @@ progress:
 See: `.planning/PROJECT.md` (updated 2026-05-03 after v1.0 milestone)
 
 **Core value:** Each CSV submission row becomes one webhook-compatible JSON object — without manual restructuring.
-**Current focus:** v1.1 Contract Hardening — opt-in JSON Schema validation (VALI-01), trailer name-based lookup (TRAIL-01), CONTRACT-01 field-name reconciliation in `quizify-mapping.js`, and Make.com JS bug fixes (peri-menu tag mismatch + inverted is_athlete). Defining requirements next.
+**Current focus:** v1.1 Contract Hardening — roadmap created; ready to plan Phase 4 (Make.com JS Contract Fixes). Phases 4-6 numbered continuing from v1.0 (which ended at Phase 3).
 
 ## Current Position
 
-Phase: Not started (defining requirements)
+Phase: Not started (roadmap complete; begin with Phase 4)
 Plan: —
-Status: Defining requirements
-Last activity: 2026-05-04 — Milestone v1.1 started
+Status: Roadmap created; awaiting phase planning
+Last activity: 2026-05-04 — Roadmap v1.1 created (Phases 4-6)
 
 ## Performance Metrics
 
@@ -41,11 +41,21 @@ Last activity: 2026-05-04 — Milestone v1.1 started
 
 ### Decisions
 
-See `.planning/PROJECT.md` Key Decisions table for the consolidated v1.0 decision log.
+See `.planning/PROJECT.md` Key Decisions table for the consolidated v1.0 + v1.1 decision log.
+
+**v1.1 locked decisions (do not re-question):**
+- VALI-01 library: `fastjsonschema` 2.21.2 as optional extra (`pip install '.[validate]'`); lazy import; preserves D-13.
+- VALI-01 is opt-in / strict-when-enabled (default off).
+- Peri-menopause canonical tag: `peri_menu` (underscore). Fix is consumer side (`score-calculations.js:213`).
+- TRAIL-01 lookup: NFC+casefold equality (NOT substring). NO positional fallback.
+- `make-scripts/` is co-owned consumer surface as of v1.1.
+- Manual verification only for JS fixes — no Node test toolchain in v1.1.
+- D-11 README drift test will fail when `--validate` is added; expected — README update in same commit.
+- Sample CSV rows 10 and 35 have "Perimenopausia" — sufficient for MAKE-FIX-01 manual verification.
 
 ### Pending Todos
 
-None — milestone shipped.
+None — awaiting `/gsd-plan-phase 4`.
 
 ### Blockers/Concerns
 
@@ -61,10 +71,10 @@ None open.
 | cosmetic | Make.com JS: `Reomoto` typo at `score-calculations.js:157` | v1.2+ | 2026-05-04 |
 | cosmetic | Make.com JS: dead-code `profile = "profile_base"` initializer at `score-calculations.js:217` | v1.2+ | 2026-05-04 |
 
-**Activated in v1.1 (no longer deferred):** VALI-01 (now opt-in / strict-when-enabled), `--trailer-columns` name-based lookup (now TRAIL-01), CONTRACT-01 (new), MAKE-FIX-01 (new — peri-menu tag mismatch + inverted is_athlete).
+**Activated in v1.1 (no longer deferred):** VALI-01 (now opt-in / strict-when-enabled), `--trailer-columns` name-based lookup (now TRAIL-01), CONTRACT-01 (new), MAKE-FIX-01..03 (new).
 
 ## Session Continuity
 
-Last session: 2026-05-04 (v1.1 milestone start, planning)
-Stopped at: gathering requirements for v1.1
-Resume file: `.planning/PROJECT.md` (Current Milestone section)
+Last session: 2026-05-04 (v1.1 roadmap created)
+Stopped at: Roadmap written; Phases 4-6 defined; ready to plan
+Resume file: `.planning/ROADMAP.md` → Phase 4 details

@@ -68,30 +68,30 @@ Explicitly excluded for v1.1. Documented to prevent scope creep and lock decisio
 
 ## Traceability
 
-Filled by `gsd-roadmapper` during phase planning. Empty initially.
+Filled by `gsd-roadmapper` during phase planning.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| VALI-01 | Phase ? | Pending |
-| VALI-02 | Phase ? | Pending |
-| VALI-03 | Phase ? | Pending |
-| VALI-04 | Phase ? | Pending |
-| VALI-05 | Phase ? | Pending |
-| VALI-06 | Phase ? | Pending |
-| TRAIL-01 | Phase ? | Pending |
-| TRAIL-02 | Phase ? | Pending |
-| TRAIL-03 | Phase ? | Pending |
-| CONTRACT-01 | Phase ? | Pending |
-| MAKE-FIX-01 | Phase ? | Pending |
-| MAKE-FIX-02 | Phase ? | Pending |
-| MAKE-FIX-03 | Phase ? | Pending |
+| VALI-01 | Phase 6 | Pending |
+| VALI-02 | Phase 6 | Pending |
+| VALI-03 | Phase 6 | Pending |
+| VALI-04 | Phase 6 | Pending |
+| VALI-05 | Phase 6 | Pending |
+| VALI-06 | Phase 6 | Pending |
+| TRAIL-01 | Phase 5 | Pending |
+| TRAIL-02 | Phase 5 | Pending |
+| TRAIL-03 | Phase 5 | Pending |
+| CONTRACT-01 | Phase 4 | Pending |
+| MAKE-FIX-01 | Phase 4 | Pending |
+| MAKE-FIX-02 | Phase 4 | Pending |
+| MAKE-FIX-03 | Phase 4 | Pending |
 
 **Coverage:**
 
 - v1.1 requirements: 13 total
-- Mapped to phases: 0 (roadmap not yet created)
-- Unmapped: 13 ⚠️ (resolves after roadmap)
+- Mapped to phases: 13 (Phase 4: 4, Phase 5: 3, Phase 6: 6)
+- Unmapped: 0 ✓
 
 ---
 *Requirements defined: 2026-05-04*
-*Last updated: 2026-05-04 after v1.1 milestone scoping*
+*Last updated: 2026-05-04 after roadmap creation (traceability filled)*
