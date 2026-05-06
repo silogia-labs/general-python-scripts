@@ -4,6 +4,41 @@ History of shipped versions for the Quizify CSV → Webhook JSON initiative insi
 
 ---
 
+## v1.2 Delivery & Make.com Hygiene — 2026-05-06
+
+**Delivered:** Closed the v1.1 deferred bucket — direct webhook delivery, large-file streaming, and Make.com hygiene with a zero-dep regression net. Operators can now POST validated payloads directly to a Make.com webhook over HTTPS in a single shot (`--post-url`, gated on `--validate`, PII-safe categorical errors), emit NDJSON line-delimited output with per-row schema validation and atomic file writes (`--ndjson`), and trust the two co-owned Make.com JS modules behind a `node:test` regression net covering CONTRACT-01 + MAKE-FIX-01/02 + MAKE-COSMETIC-01/02. `convert()` was rebuilt around an `iter_rows()` generator and a pluggable `_Sink` Protocol with byte-identical default output (TRAIL-03 green).
+
+**Stats:**
+
+- Phases: 4 (Refactor Scaffolding / STREAM-01 NDJSON Output / AUTO-01 HTTP POST Delivery / Make.com Hygiene & Node Test Harness)
+- Plans: 9 (all complete)
+- Requirements: 16/16 (REFACTOR=1, STREAM=4, AUTO=6, MAKE=5)
+- Tests: pytest 163 passed / 4 skipped (Pitfall 8-E pre-authorized) + `node --test` 9 passed / 0 failed
+- Timeline: 2026-05-05 → 2026-05-06
+
+**Key accomplishments:**
+
+- **REFACTOR-01** — `convert()` rebuilt around `iter_rows()` generator + `_Sink` Protocol (`_StdoutSink`/`_FileSink`/`_NdjsonFileSink`/`_ValidatingSink`/`_HttpPostSink`); default-flag output byte-identical to v1.1 golden fixture (TRAIL-03 carry-forward green).
+- **STREAM-01..04** — `--ndjson` file-mode output with `\n` line separator, per-row `schema["items"]` validation (lazy `fastjsonschema`, compile-once, row-prefixed JSON Pointer), atomic `os.replace()` promotion, SIGINT-safe (no partial file at target).
+- **AUTO-01..06** — `--post-url` HTTPS-only single-shot POST with mandatory `--validate` gate, repeatable `--header` (CRLF rejected at argparse), `--timeout` (default 30, exit 3 on stall), `_NoRedirectHandler` blocks cross-host redirects, `_log_http_failure` chokepoint emits categorical-only stderr (status + reason class + body byte count, never response body or URL).
+- **MAKE-COSMETIC-01/02** — `Reomoto`→`Remoto` typo fix + dead `profile = "profile_base"` initializer removal, both locked behind `node:test` regression cases.
+- **MAKE-TEST-01..03** — Zero-dep `node:test` harness; `mapRecord(record)` exposed as pure function on both modules with `module.exports` guarded by `typeof module !== "undefined"` (deployed Make.com files paste in unchanged); `globalThis` snapshot test detects accidental global writes; `pyproject.toml` `norecursedirs` + `make-scripts/.gitignore` keep Python collection clean.
+- **CI** — `.github/workflows/ci.yml` runs parallel `pytest` + `make-scripts-test` jobs on push/PR.
+- **Security gates (CI grep)** — 0 `CERT_NONE`/`_create_unverified_context`/`verify=False`; exactly 1 `ssl.create_default_context()`; exactly 1 `self._opener.open(`; exactly 1 `Request(...method="POST")`; 0 `shutil.move`/`os.rename`; 0 `import requests` (D-13 stdlib-only-at-runtime preserved).
+
+**Tech debt carried forward:**
+
+- Phase 9 SUMMARY frontmatter missing `requirements-completed` field (cosmetic; manual verification step required by milestone audit's 3-source matrix). Recorded in v1.2-MILESTONE-AUDIT.md.
+
+**Deferred to v1.3+:**
+
+- NDJSON+POST cross-product (partial-success semantics need design)
+- `--retry N` exponential backoff (Make.com idempotency unverified)
+- `--idempotency-key` (Make.com idempotency-key support unverified)
+- `$QUIZIFY_WEBHOOK_URL` / `--post-url-env` (defer unless operator pain reported)
+
+---
+
 ## v1.1 Contract Hardening & Make.com Alignment — 2026-05-04
 
 **Delivered:** Locked the JSON contract end-to-end between the Python CLI and the Make.com automation pipeline. Three live Make.com correctness bugs fixed in the now-co-owned JS modules; positional trailer-cell scoring lookup retired in favor of NFC+casefold name-based binding (D-15 retired); opt-in JSON Schema Draft-07 validation shipped via a new `--validate` flag backed by `fastjsonschema` as an optional extra (runtime stays stdlib-only by default).

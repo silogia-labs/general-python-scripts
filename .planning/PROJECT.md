@@ -2,7 +2,7 @@
 
 ## What This Is
 
-This initiative lives inside the `general-python-scripts` utilities repository. It ships a small Python helper (`quizify-csv-to-json-webhook/quizify_csv_ingest.py`) that turns Quizify.io CSV exports (from https://app.quizify.io) into JSON arrays shaped like `quizify-csv-to-json-webhook/docs/webhook-quizify-format-example.json`, so integrations that expect webhook-style records can consume exports without manual rework. The JSON is consumed by a Make.com (Integromat) automation pipeline; the two JS modules in `quizify-csv-to-json-webhook/make-scripts/` (`quizify-mapping.js`, `score-calculations.js`) are co-owned consumer surfaces of this initiative as of v1.1. v1.0 (2026-05-03) delivered the full CSV→JSON pipeline; v1.1 hardens the contract end-to-end and aligns the Make.com side.
+This initiative lives inside the `general-python-scripts` utilities repository. It ships a small Python helper (`quizify-csv-to-json-webhook/quizify_csv_ingest.py`) that turns Quizify.io CSV exports (from https://app.quizify.io) into JSON for a Make.com (Integromat) automation pipeline. As of v1.2, operators have three output surfaces: stdout/file JSON array (default, byte-identical to v1.0), NDJSON line-delimited file output (`--ndjson`, with per-row schema validation and atomic writes), and direct HTTPS POST to a Make.com webhook (`--post-url`, gated on `--validate`, PII-safe categorical errors). The two JS modules in `quizify-csv-to-json-webhook/make-scripts/` (`quizify-mapping.js`, `score-calculations.js`) are co-owned consumer surfaces locked behind a zero-dep `node:test` regression net.
 
 ## Core Value
 
@@ -10,47 +10,44 @@ Each CSV submission row becomes one webhook-compatible JSON object with correct 
 
 ## Current State
 
-**Shipped: v1.1 Contract Hardening & Make.com Alignment (2026-05-04)** — see `.planning/MILESTONES.md` and `.planning/milestones/v1.1-ROADMAP.md`.
+**Shipped: v1.2 Delivery & Make.com Hygiene (2026-05-06)** — see `.planning/MILESTONES.md` and `.planning/milestones/v1.2-ROADMAP.md`.
+**Shipped: v1.1 Contract Hardening & Make.com Alignment (2026-05-04)** — see `.planning/milestones/v1.1-ROADMAP.md`.
 **Shipped: v1.0 MVP (2026-05-03)** — see `.planning/milestones/v1.0-ROADMAP.md`.
 
-**In progress: v1.2 Delivery & Make.com Hygiene** — see Current Milestone section below.
+**Next milestone:** TBD — run `/gsd-new-milestone` to scope v1.3.
 
-- 94 tests passing (1.28s) across layout, row-builder, CLI emission, PII logging, golden-file structure, structural invariants, quiz-title precedence, README/`--help` drift, default-order regression (TRAIL-03), scoring-index-map binding (TRAIL-01/02), and schema validation (VALI-01..05) including PII-safe failure-stderr tests.
-- Runtime stays stdlib-only (D-13 preserved via lazy import); `fastjsonschema>=2.21.2` is an opt-in `[validate]` extra installable via `pip install '.[validate]'`.
-- Single-file implementation: `quizify_csv_ingest.py` + `pyproject.toml` (PEP 621 / flit_core); operator README extended with `--validate` documentation (D-11 ten-section lock preserved).
-- Co-owned consumer surface: `quizify-csv-to-json-webhook/make-scripts/` (`quizify-mapping.js`, `score-calculations.js`) + `make-scripts/CONVENTIONS.md`.
-- CLI surface: `csv_path` positional + `--dry-run`, `-v`/`--verbose`, `--trailer-columns`, `-o`/`--output`, `--emit-json`, `--quiz-title` (with `$QUIZIFY_QUIZ_TITLE` env fallback), `--validate` (opt-in JSON Schema gate).
+- 163 Python tests passing + 4 skipped (Pitfall 8-E pre-authorized) + `node --test make-scripts/` 9 passed / 0 failed.
+- Three output surfaces: stdout/file JSON array (default, byte-identical to v1.0), NDJSON file (`--ndjson`, atomic), HTTPS POST (`--post-url --validate`).
+- Runtime stays stdlib-only (D-13 preserved via lazy import); `fastjsonschema>=2.21.2` is an opt-in `[validate]` extra. HTTP delivery uses `urllib.request` only — no `requests` dependency.
+- Single-file Python implementation: `quizify_csv_ingest.py` + `pyproject.toml` (PEP 621 / flit_core), now wrapped around `iter_rows()` generator + `_Sink` Protocol with five concrete sinks.
+- Co-owned consumer surface: `quizify-csv-to-json-webhook/make-scripts/` with `node:test` harness covering CONTRACT-01, MAKE-FIX-01/02, MAKE-COSMETIC-01/02; zero npm dependencies enforced by CI grep gate.
+- CLI surface: `csv_path` positional + `--dry-run`, `-v`/`--verbose`, `--trailer-columns`, `-o`/`--output`, `--emit-json`, `--quiz-title` (with `$QUIZIFY_QUIZ_TITLE` env fallback), `--validate`, `--ndjson`, `--post-url`, `--header` (repeatable), `--timeout`.
 - Schema artifact: `quizify-csv-to-json-webhook/docs/webhook-schema.json` (Draft-07).
+- CI: `.github/workflows/ci.yml` runs parallel `pytest` + `make-scripts-test` jobs on push/PR.
 
-## Current Milestone: v1.2 Delivery & Make.com Hygiene
+<details>
+<summary>Previous Milestone Goal — v1.2 (shipped 2026-05-06)</summary>
 
 **Goal:** Close the v1.1 deferred bucket — ship HTTP POST delivery gated on `--validate`, add streaming output for large CSVs, and clean up the co-owned Make.com JS modules with a Node test harness.
 
-**Target features:**
+**Shipped:**
+- **REFACTOR-01** — `convert()` rebuilt around `iter_rows()` + `_Sink` Protocol (Phase 7).
+- **STREAM-01..04** — `--ndjson` file output with per-row validation and atomic writes (Phase 8).
+- **AUTO-01..06** — `--post-url` HTTPS POST with `--validate` gate, PII-safe error logging (Phase 9).
+- **MAKE-COSMETIC-01/02 + MAKE-TEST-01..03** — JS hygiene + zero-dep `node:test` harness + CI (Phase 10).
 
-- **AUTO-01** — HTTP POST delivery mode (gated on VALI-01 schema validity; stdlib `urllib` preserves D-13).
-- **STREAM-01** — Streaming / NDJSON output for >50k-row CSVs (T-RESOURCE-01 follow-through).
-- **MAKE-COSMETIC-01** — Fix `Reomoto` typo at `score-calculations.js:157`.
-- **MAKE-COSMETIC-02** — Remove dead `profile = "profile_base"` initializer at `score-calculations.js:217`.
-- **MAKE-TEST-01** — Introduce Node.js test harness for `make-scripts/` (lands with cosmetic fixes, no longer gated on LOC).
-
-**Key context:**
-
-- AUTO-01 reuses `--validate` semantics — payloads must pass schema validation before egress.
-- T-PII-01 extends to HTTP error surfaces: log status codes + categorical reasons only, never payload bytes.
-- D-13 stdlib-only-at-runtime preserved: `urllib` for POST, no `requests` dependency.
+</details>
 
 <details>
-<summary>Previous Milestone Goal Section — v1.1 (shipped 2026-05-04)</summary>
+<summary>Previous Milestone Goal — v1.1 (shipped 2026-05-04)</summary>
 
 **Goal:** Lock down the JSON contract between the Python CLI and the Make.com automation by adding opt-in strict JSON Schema validation, eliminating positional mis-bind risk in trailer scoring, reconciling the field-name mismatch with `quizify-mapping.js`, and fixing two correctness bugs in the now-in-scope Make.com JS modules.
 
-**Target features (all shipped):**
-
-- **VALI-01** — Opt-in JSON Schema validation via `--validate` flag (✓ shipped Phase 6).
-- **TRAIL-01** — Name-based scoring lookup (✓ shipped Phase 5; D-15 retired).
-- **CONTRACT-01** — `quizify-mapping.js:102` reads `record["product-recommendation"]` (✓ shipped Phase 4).
-- **MAKE-FIX-01..03** — Peri-menopause tag canonicalization, `activity_profile` inversion fix, `make-scripts/CONVENTIONS.md` (✓ shipped Phase 4).
+**Shipped:**
+- **VALI-01** — Opt-in JSON Schema validation via `--validate` flag (Phase 6).
+- **TRAIL-01** — Name-based scoring lookup (Phase 5; D-15 retired).
+- **CONTRACT-01** — `quizify-mapping.js:102` reads `record["product-recommendation"]` (Phase 4).
+- **MAKE-FIX-01..03** — Peri-menopause tag canonicalization, `activity_profile` inversion fix, `make-scripts/CONVENTIONS.md` (Phase 4).
 
 </details>
 
@@ -79,10 +76,19 @@ Each CSV submission row becomes one webhook-compatible JSON object with correct 
 - ✓ Default-off / zero-behavioral-change for unflagged callers — v1.1 (VALI-04, byte-identical stdout verified)
 - ✓ `fastjsonschema>=2.21.2` as `[validate]` optional extra; lazy import preserves D-13 stdlib-only-at-runtime; missing-extra path exits with locked D-06-19 verbatim message — v1.1 (VALI-05)
 - ✓ README documents `--validate` flag, install line, schema path; D-11 drift test (2/2) green — v1.1 (VALI-06)
+- ✓ `convert()` refactored to `iter_rows()` generator + `_Sink` Protocol; default output byte-identical to v1.1 (TRAIL-03 carry-forward green) — v1.2 (REFACTOR-01)
+- ✓ `--ndjson` file-mode output with `\n` line separator, per-row schema validation, atomic `os.replace()` promotion, SIGINT-safe — v1.2 (STREAM-01..04)
+- ✓ `--post-url` HTTPS-only single-shot POST gated on `--validate`; argparse exits 2 with categorical stderr if violated — v1.2 (AUTO-01, AUTO-02)
+- ✓ Repeatable `--header "K: V"` (CRLF rejected at argparse); `--timeout SECONDS` (default 30, exit 3 on stall with PII-safe stderr) — v1.2 (AUTO-03, AUTO-04)
+- ✓ HTTPS-only egress; `_NoRedirectHandler` blocks cross-host redirects; default `ssl.create_default_context()`; CI grep gate enforces no `CERT_NONE`/`_create_unverified_context`/`verify=False` — v1.2 (AUTO-05)
+- ✓ Non-2xx responses exit 3 with categorical-only stderr (status + reason class + body byte count); response body content never logged (PII-safe by construction) — v1.2 (AUTO-06)
+- ✓ `Reomoto`→`Remoto` typo fix + dead `profile_base` initializer removal, locked behind `node:test` regression cases — v1.2 (MAKE-COSMETIC-01, MAKE-COSMETIC-02)
+- ✓ Zero-dep `node:test` harness covering CONTRACT-01 + MAKE-FIX-01/02 + MAKE-COSMETIC-01/02; pure `mapRecord(record)` exposed on both modules with `module.exports` guarded; deployed Make.com files paste in unchanged — v1.2 (MAKE-TEST-01, MAKE-TEST-02)
+- ✓ Empty `dependencies`/`devDependencies` enforced by CI gate; `pyproject.toml` `norecursedirs` blocks `make-scripts`; `.gitignore` blocks `node_modules`/`coverage` — v1.2 (MAKE-TEST-03)
 
 ### Active
 
-(v1.2 requirements pending — see **Current Milestone** above. REQUIREMENTS.md will be regenerated this milestone.)
+(No active requirements — run `/gsd-new-milestone` to scope v1.3. Deferred candidates: NDJSON+POST cross-product, `--retry N` exponential backoff, `--idempotency-key`, `$QUIZIFY_WEBHOOK_URL` / `--post-url-env`.)
 
 ### Out of Scope
 
@@ -129,6 +135,14 @@ Each CSV submission row becomes one webhook-compatible JSON object with correct 
 | CONTRACT-01 fixes the Make.com side rather than emitting an alias key from Python | D-05 JSON tail-key order is locked; introducing `product_result` as an alias would override D-05 without justification. Single-line fix in `quizify-mapping.js:102` is correct | v1.1 |
 | No new JS test toolchain in v1.1 (manual verification against `quizify-submissions.csv` sample only) | Preserves v1.0's stdlib-only ethos; two short files don't justify a Node test runner. Revisit if `make-scripts/` grows beyond ~500 LOC | v1.1 — deferred to v1.2 if scope expands |
 | VALI-01 shipped (Phase 6 / D-06-01..D-06-25, 2026-05-04): `--validate` flag (opt-in) backed by Draft-07 schema at `docs/webhook-schema.json`; `fastjsonschema>=2.21.2` as optional `[validate]` extra; lazy import preserves D-13 stdlib-only-at-runtime; PII-safe stderr templates locked (D-06-19, D-06-20) | Closes v1.1 schema validation goal without forcing a runtime dependency on default callers; gives CI/automation a fast-fail path while keeping default behavior byte-for-byte unchanged | ✓ Shipped — v1.1 (2026-05-04) |
+| Sink Protocol + `iter_rows()` generator refactor (D-07 sink layer) lands as no-op Phase 7 before STREAM-01 / AUTO-01 | Decouples output strategy from row generation; lets STREAM-01 add `_NdjsonFileSink` and AUTO-01 replace stub `_HttpPostSink` without churning `convert()`. Byte-identity test (TRAIL-03 parallel) catches refactor regressions | ✓ Good — v1.2 (Phase 7); zero behavioral change for default callers |
+| Mandatory `--validate` gate on `--post-url` (AUTO-02) rather than opt-in | Ensures schema-invalid payloads never leave the process; HTTP egress is the highest-risk surface for PII or contract drift; argparse exits 2 with categorical stderr | ✓ Good — v1.2 (Phase 9); zero schema-invalid payloads on the wire |
+| `_NoRedirectHandler` blocks all cross-host redirects rather than allow-list | Make.com webhook URL is fixed and known; following redirects opens an exfiltration vector and breaks the categorical-error contract; categorical `http_unexpected_redirect` log instead | ✓ Good — v1.2 (Phase 9); `test_redirect_rejected` enforces |
+| `_log_http_failure` chokepoint for all HTTP error surfaces; categorical-only stderr (status + reason class + body byte count, never body or URL) | Single PII-safe formatter is easier to audit than scattered `print` calls; T-PII-01 carry-forward verified by 8 negative-substring tests against `quizify-submissions.csv`-derived synthetic fixtures | ✓ Good — v1.2 (Phase 9) |
+| Atomic `os.replace()` is the ONLY promotion path for NDJSON file output (Phase 8 D-08); SIGINT mid-stream leaves no partial file at target | Operators using NDJSON typically pipe to durable storage; partial files are worse than no file. CI grep gate forbids `shutil.move`/`os.rename` | ✓ Good — v1.2 (Phase 8); `test_sigint_leaves_no_target` enforces |
+| Zero-dep `node:test` harness in `make-scripts/` over Vitest/Jest/Mocha | Two-module surface doesn't justify supply-chain footprint; `node:test` is Node 20+ stdlib; CI grep gate enforces empty `dependencies`/`devDependencies` | ✓ Good — v1.2 (Phase 10); 9/9 green, zero npm install |
+| `mapRecord(record)` pure function with `module.exports` guarded by `typeof module !== "undefined"` | Deployed Make.com files paste in unchanged (Make.com sandbox has no `module`); CI tests can still import and run; `globalThis` snapshot test detects accidental global writes | ✓ Good — v1.2 (Phase 10) |
+| Phase 9 SUMMARY frontmatter shipped without `requirements-completed` field | Manual oversight; surfaced by milestone audit's 3-source matrix; non-blocking but recorded as cosmetic tech debt for v1.3 hygiene | ⚠️ Revisit — fix in v1.3 SUMMARY conventions |
 
 ## Evolution
 
@@ -150,4 +164,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-05-05 — v1.2 Delivery & Make.com Hygiene milestone started*
+*Last updated: 2026-05-06 after v1.2 Delivery & Make.com Hygiene milestone shipped*

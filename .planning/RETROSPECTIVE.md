@@ -113,16 +113,67 @@ Living retrospective. Each milestone appends a section before the "Cross-Milesto
 
 ---
 
+## Milestone: v1.2 — Delivery & Make.com Hygiene
+
+**Shipped:** 2026-05-06
+**Phases:** 4 | **Plans:** 9 | **Tests at close:** 163 (Python) + 9 (Node) = 172
+
+### What Was Built
+
+- Phase 7: `iter_rows()` generator + `_Sink` Protocol refactor; default-flag output byte-identical to v1.1 golden fixture (TRAIL-03 carry-forward green); shipped as no-op to de-risk Phases 8-9.
+- Phase 8: `_NdjsonFileSink` (atomic `.tmp` + `os.replace()`), `_ValidatingSink` decorator (lazy `fastjsonschema`, compile-once, row-prefixed JSON Pointer), `_RowValidationError`, `--ndjson` argparse flag, SIGINT-safe.
+- Phase 9: `_HttpPostSink` real implementation, `_NoRedirectHandler`, `_log_http_failure` PII-safe chokepoint, `_parse_header`, `_https_url`; `--post-url`, `--header` (repeatable), `--timeout`, mandatory `--validate` gate.
+- Phase 10: zero-dep `node:test` harness; `mapRecord(record)` exposed on both Make.com modules; `Reomoto`→`Remoto` typo fix + dead `profile_base` initializer removal; `.github/workflows/ci.yml` with parallel `pytest` + `make-scripts-test` jobs.
+
+### What Worked
+
+- **Phase 7 as a no-op de-risker.** Landing the sink Protocol + `iter_rows()` refactor *before* any new behavior meant Phases 8 and 9 each just dropped in a new `_Sink` subclass. Byte-identity test (TRAIL-03 carry-forward) caught any refactor regression at task-commit latency. Pattern worth repeating when the next milestone needs a structural change before feature work.
+- **CI grep gates as security tests.** `test_security_grep_gates.py` encodes "exactly 1 `ssl.create_default_context()`", "exactly 1 `Request(...method='POST')`", "no `import requests`", etc. as pytest cases instead of shell snippets in CI yaml. They run with the rest of the suite, fail with helpful pytest output, and live next to the code they constrain. Higher-fidelity than yaml grep.
+- **Negative-substring PII tests scaled cleanly.** `test_http_post_pii.py::TestHTTPErrorPIIsafe` extends the v1.0 pattern (synthesize PII tokens, assert never in stderr) to HTTP error surfaces. 8 parametrized variants — one chokepoint to verify (`_log_http_failure`), wide attack surface, low test cost.
+- **Mandatory `--validate` gate on `--post-url` (AUTO-02) over opt-in.** Removing the failure mode entirely beats documenting it. argparse exit-2 with categorical stderr if violated; integration tests verified zero server requests on schema-invalid input.
+- **Module-exports guard for Make.com modules.** `typeof module !== "undefined"` lets tests `require()` the module while the deployed Make.com sandbox (no `module`) pastes the file in unchanged. `globalThis` snapshot test detects accidental global writes — small, fast, durable.
+- **Audit-then-close discipline closed gaps before tag.** `/gsd-audit-milestone` flagged a missing 09-VERIFICATION.md and three VALIDATION.md drafts — back-filled and approved before tag. Without the audit, v1.2 would have shipped with documentation gaps under green tests.
+
+### What Was Inefficient
+
+- **Phase 9 shipped without VERIFICATION.md.** Code and tests landed green, but the goal-backward verification artifact was never authored. Surfaced only at `/gsd-audit-milestone`. Lesson: `/gsd-execute-phase` should not exit successful without a VERIFICATION.md, even (especially) when all tests pass.
+- **VALIDATION.md drafts shipped as `nyquist_compliant: false`.** Three phases approved their tests but never flipped the validation frontmatter. Cosmetic, but it forces an extra `/gsd-validate-phase` pass at milestone close. Could be auto-flipped during execute-phase when all map rows resolve green.
+- **Phase 9 SUMMARY frontmatter missing `requirements-completed`.** Forced manual verification step in milestone audit's 3-source matrix. Two phases (Phase 10 had it; Phase 9 didn't) is exactly the kind of inconsistency that makes audit logic messy. Lesson: SUMMARY template should require this field.
+- **Test-name drift between PLAN and as-built.** Phase 9's VALIDATION.md map cited 11 planner-stage names (`test_happy_path_sends_one_request`) that diverged from as-built (`test_happy_path_one_request`). Cosmetic — auditor confirmed every row resolves to a green test — but it forces audit-time reconciliation. Lesson: planner names should be either treated as advisory only, or executor should sync the map back at GREEN.
+
+### Patterns Established
+
+- **CI grep gates as pytest tests** rather than yaml snippets — see `test_security_grep_gates.py`. Pattern carries forward.
+- **Sink Protocol + iter_rows() generator** for output strategy decoupling. Lets new output modes drop in without touching `convert()`.
+- **PII-safe chokepoint helpers** like `_log_http_failure` — single formatter, easy to audit, negative-substring tests verify.
+- **Module-exports guard** for files that paste into sandboxed runtimes (Make.com, Cloudflare Workers, etc.) while staying testable.
+- **Audit-then-back-fill closure** when verification artifacts are missing but tests are green: re-run integration check, write retroactive VERIFICATION.md with explicit timestamp, audit-trail paragraph noting how the gap was discovered.
+
+### Key Lessons
+
+1. **`/gsd-execute-phase` should require VERIFICATION.md before exiting successful.** Phase 9 proved that green tests + green CI + green grep gates + green integration check still don't replace a goal-backward verification document. It's a different artifact answering a different question (did we achieve the *goal*?), and missing it forced a milestone-close gap.
+2. **VALIDATION.md frontmatter should auto-flip on all-green.** When every map row resolves to a green test, manual `/gsd-validate-phase` re-pass is busywork. Either auto-flip during execute-phase or have the audit accept "all rows green" as equivalent to `nyquist_compliant: true`.
+3. **SUMMARY.md `requirements-completed` should be enforced by template.** The 3-source matrix gives auditable cross-references when all three sources are present and degrades gracefully when one is missing — but only if missingness is rare.
+4. **Refactor-before-feature lands cleaner than refactor-during-feature.** Phase 7 as a no-op was the highest-leverage decision in v1.2; Phases 8 and 9 each took ~1 commit's worth of integration work because the sink Protocol absorbed it.
+
+### Cost Observations
+
+- Sessions: 4 (one per phase) + 1 milestone close
+- Notable: Phase 10 ran fully parallel-safe with Phases 7-9 (independent surface). Could have been wave-parallelized if scheduling permitted; landed sequentially for context simplicity.
+
+---
+
 ## Cross-Milestone Trends
 
 | Trend | v1.0 | v1.1 | v1.2 |
 |-------|------|------|------|
-| Tests at close | 71 | 94 | — |
-| Plans per phase (avg) | 1.67 | 3.0 | — |
-| Auto-fixed deviations | 5 | 3+ | — |
-| New runtime dependencies | 0 | 0 (opt-in extra only) | — |
-| Phases in milestone | 3 | 3 | — |
-| Milestone duration | 1 day | 2 days | — |
-| Audit run pre-close? | no | yes (passed) | — |
+| Tests at close (Python) | 71 | 94 | 163 |
+| Tests at close (Node) | — | — | 9 |
+| Plans per phase (avg) | 1.67 | 3.0 | 2.25 |
+| Auto-fixed deviations | 5 | 3+ | 5+ |
+| New runtime dependencies | 0 | 0 (opt-in extra only) | 0 (stdlib `urllib` only) |
+| Phases in milestone | 3 | 3 | 4 |
+| Milestone duration | 1 day | 2 days | 2 days |
+| Audit run pre-close? | no | yes (passed) | yes (gaps_found → passed after back-fill) |
 
-**Recurring pattern (2 consecutive milestones):** REQUIREMENTS.md traceability checkboxes drift during execution and require a refresh sweep at milestone close. Lesson 1 above is the structural fix.
+**Recurring pattern (3 consecutive milestones):** Verification-artifact drift during execution. v1.0 = REQUIREMENTS.md checkbox drift; v1.1 = pre-audit run resolved this; v1.2 = same pattern moved up a level (VERIFICATION.md missing, VALIDATION.md drafts un-flipped, SUMMARY frontmatter incomplete). Lesson: each tightening of one artifact reveals the next-loosest. v1.3 should harden the execute-phase exit gate to require VERIFICATION.md + flipped VALIDATION.md + complete SUMMARY frontmatter.
