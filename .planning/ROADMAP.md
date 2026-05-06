@@ -87,7 +87,10 @@
   3. Both JS modules expose a pure `mapRecord(record)` function with `module.exports` guarded by `typeof module !== "undefined"`; deployed Make.com files paste in unchanged; `"use strict";` is at the top of every module; a `globalThis` snapshot test detects accidental global writes across `mapRecord(fixture)` calls.
   4. `make-scripts/package.json` ships with empty `dependencies` and empty `devDependencies` (CI gate enforces); `pyproject.toml` `[tool.pytest.ini_options]` adds `norecursedirs = ["make-scripts", "node_modules"]`; `make-scripts/.gitignore` blocks `node_modules/` and `coverage/`.
   5. JS test fixtures are synthetic-only (T-PII-01 carry-forward — no PII from `quizify-submissions.csv` in `make-scripts/tests/fixtures/`); README documentation additions for `make-scripts/` testing keep the D-11 ten-section lock + drift test green.
-**Plans**: TBD
+**Plans:** 3 plans
+  - [ ] 10-01-PLAN.md — RED scaffolding: mapRecord+footer wrap (typo+dead-init PRESERVED), 6 node:test files, fixtures, package.json, .gitignore, pyproject.toml norecursedirs, 2 Python grep-gate tests.
+  - [ ] 10-02-PLAN.md — GREEN cosmetic fixes: Reomoto→Remoto at score-calculations.js:157; remove dead profile_base init at :217. Flips 6/6 node:test files green.
+  - [ ] 10-03-PLAN.md — CI wiring + README docs: fresh .github/workflows/ci.yml with parallel pytest + make-scripts-test jobs; ### Make.com module tests subsection under ## Development (D-11 lock preserved).
 
 ## Progress
 
@@ -102,4 +105,4 @@
 | 7. Refactor Scaffolding (no-op)     | v1.2 | 2/2 | Complete    | 2026-05-06 |
 | 8. STREAM-01 NDJSON Output          | v1.2 | 2/2 | Complete    | 2026-05-05 |
 | 9. AUTO-01 HTTP POST Delivery       | v1.2 | 2/2 | Complete    | 2026-05-05 |
-| 10. Make.com Hygiene & Node Tests   | v1.2 | 0/0 | Not started | —          |
+| 10. Make.com Hygiene & Node Tests   | v1.2 | 0/3 | Planned     | —          |
