@@ -50,3 +50,42 @@ def test_default_order_byte_identical_to_v1_0_baseline() -> None:
         assert "result-logic" in r
         assert "score-category" in r
         assert "score-value" in r
+
+
+def test_phase7_refactor_byte_identical_to_v1_0_baseline(capsys) -> None:
+    """REFACTOR-01 SC#1: post-Phase-7 default-order output via direct convert() call
+    is structurally identical to the v1.0/v1.1 golden fixture.
+
+    Unit-level (capsys) per D-07-13 / Pitfall 16. The existing subprocess-driven
+    TRAIL-03 test above stays as the literal-byte oracle; this twin protects
+    the refactor at the function-call boundary.
+    """
+    from quizify_csv_ingest import convert
+    rc = convert(FIXTURE, None, None, "")
+    captured = capsys.readouterr()
+    assert rc == 0, f"convert() returned non-zero rc={rc}; stderr={captured.err!r}"
+    actual = json.loads(captured.out)
+    expected = json.loads(GOLDEN.read_text(encoding="utf-8"))
+    assert actual == expected, (
+        "Phase 7 refactor diverged from v1.0/v1.1 baseline; "
+        "REFACTOR-01 SC#1 (byte-identical default output) violated."
+    )
+    assert len(actual) == 42
+    for r in actual:
+        assert "result-logic" in r
+        assert "score-category" in r
+        assert "score-value" in r
+
+
+def test_phase7_iter_rows_symbol_exists() -> None:
+    """REFACTOR-01 SC#2: `iter_rows` is the named public symbol per ROADMAP.
+
+    FAILS-RED until Plan 02 adds the symbol. Catching this at import time is
+    the contract gate for 'the refactor actually happened, not just got
+    renamed in convert()'.
+    """
+    import quizify_csv_ingest
+    assert hasattr(quizify_csv_ingest, "iter_rows"), (
+        "Phase 7 refactor must expose `iter_rows` as a top-level symbol "
+        "(ROADMAP SC#2)."
+    )
