@@ -3,6 +3,9 @@
 from __future__ import annotations
 
 import csv
+import http.server
+import threading
+import time
 from pathlib import Path
 
 import pytest
@@ -196,3 +199,85 @@ def csv_with_bad_row_at_50(tmp_path: Path) -> Path:
     out = tmp_path / "synthetic.csv"
     out.write_text("\n".join(lines) + "\n", encoding="utf-8")
     return out
+
+
+# ---------------------------------------------------------------------------
+# Phase 9 (Plan 09-01) — mock_webhook fixture for AUTO-01..06 RED scaffolding.
+# Loopback http.server listening on 127.0.0.1:<ephemeral>, with 4 response
+# handler factories. Synthetic PII markers ONLY (T-PII-01-safe).
+# Pitfalls mitigated: (2) finite hang sleep + thread.join; (9) silenced
+# log_message; (10) allow_reuse_address. See 09-RESEARCH.md "Mock-server
+# fixture (refined)".
+# ---------------------------------------------------------------------------
+
+
+class _ReusableHTTPServer(http.server.HTTPServer):
+    allow_reuse_address = True
+
+
+class _BaseHandler(http.server.BaseHTTPRequestHandler):
+    def do_POST(self):
+        n = int(self.headers.get("Content-Length", "0"))
+        body = self.rfile.read(n)
+        self.server.received.append(("POST", body, dict(self.headers)))
+        self._respond()
+
+    def log_message(self, *a, **kw):  # silence default stderr noise (Pitfall 9)
+        pass
+
+
+def _respond_200(handler):
+    body = b"server_response_marker"
+    handler.send_response(200)
+    handler.send_header("Content-Type", "text/plain")
+    handler.send_header("Content-Length", str(len(body)))
+    handler.end_headers()
+    handler.wfile.write(body)
+
+
+def _respond_502(handler):
+    body = b"Bad Gateway!!"  # exactly 13 bytes
+    handler.send_response(502)
+    handler.send_header("Content-Type", "text/plain")
+    handler.send_header("Content-Length", "13")
+    handler.end_headers()
+    handler.wfile.write(body)
+
+
+def _respond_302(handler):
+    handler.send_response(302)
+    handler.send_header("Location", "http://other.example.test/x")
+    handler.send_header("Content-Length", "0")
+    handler.end_headers()
+
+
+def _respond_hang(handler):
+    time.sleep(2.0)  # finite — NOT infinite (Pitfall 2)
+    body = b"server_response_marker"
+    handler.send_response(200)
+    handler.send_header("Content-Type", "text/plain")
+    handler.send_header("Content-Length", str(len(body)))
+    handler.end_headers()
+    handler.wfile.write(body)
+
+
+@pytest.fixture
+def mock_webhook():
+    """Factory fixture: call with respond_fn -> (url, received, server)."""
+    servers: list[tuple[_ReusableHTTPServer, threading.Thread]] = []
+
+    def factory(respond_fn):
+        klass = type("H", (_BaseHandler,), {"_respond": respond_fn})
+        server = _ReusableHTTPServer(("127.0.0.1", 0), klass)
+        server.received = []
+        thread = threading.Thread(target=server.serve_forever, daemon=True)
+        thread.start()
+        servers.append((server, thread))
+        url = f"http://127.0.0.1:{server.server_address[1]}"
+        return url, server.received, server
+
+    yield factory
+    for server, thread in servers:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=2.0)
