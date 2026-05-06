@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: Delivery & Make.com Hygiene
-status: completed
-last_updated: "2026-05-06T03:57:00.706Z"
-last_activity: 2026-05-06 -- Phase 8 marked complete
+status: executing
+last_updated: "2026-05-06T04:45:00.000Z"
+last_activity: 2026-05-06 -- Phase 9 Plan 01 (RED scaffolding) complete
 progress:
   total_phases: 4
   completed_phases: 2
-  total_plans: 4
+  total_plans: 6
   completed_plans: 4
-  percent: 100
+  percent: 67
 ---
 
 # Project State
@@ -20,15 +20,15 @@ progress:
 See: `.planning/PROJECT.md` (updated 2026-05-04 after v1.1 milestone)
 
 **Core value:** Each CSV submission row becomes one webhook-compatible JSON object — without manual restructuring.
-**Current focus:** Phase 8 — stream-01-ndjson-output
+**Current focus:** Phase 9 — auto-01-http-post-delivery
 
 ## Current Position
 
-Phase: 8 — COMPLETE
-Plan: 2 of 2
-Status: Phase 8 complete
-Last activity: 2026-05-06 -- Phase 8 marked complete
-Progress: ░░░░░░░░░░ 0% (0/4 v1.2 phases complete)
+Phase: 9 (auto-01-http-post-delivery) — EXECUTING
+Plan: 2 of 2 (Plan 09-01 RED scaffolding complete; 09-02 GREEN impl next)
+Status: Executing Phase 9
+Last activity: 2026-05-06 -- Phase 9 Plan 01 (RED scaffolding) complete; 32 RED tests collected, 29 failing, 127 baseline green
+Progress: ██░░░░░░░░ 25% (1/4 v1.2 phases-or-plans logical units; Phase 9 50% — Plan 1 of 2 done)
 
 ## Phases (v1.2)
 
@@ -92,5 +92,5 @@ None open. Two research-phase flags carried into the planning phase:
 
 ## Session Continuity
 
-Last session: 2026-05-06T03:57:00.702Z
-Resume action: `/gsd-plan-phase 7` to plan the refactor scaffolding (no-op) phase.
+Last session: 2026-05-06T04:45:00.000Z
+Resume action: Execute Plan 09-02 (GREEN impl) — wire `_HttpPostSink(url, headers, timeout)`, `_NoRedirectHandler`, `_log_http_failure`, `_parse_header`, `_https_url`, `--header`/`--timeout` argparse flags, single `OpenerDirector` with one `ssl.create_default_context()` and one `self._opener.open(...)` call. Target: turn 29 RED tests GREEN; preserve 127 baseline.
