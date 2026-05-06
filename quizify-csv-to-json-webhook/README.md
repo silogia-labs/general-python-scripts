@@ -33,6 +33,16 @@ pip install '.[validate]'
 
 The `[validate]` extra installs `fastjsonschema` so the `--validate` flag can check the emitted JSON against [`docs/webhook-schema.json`](docs/webhook-schema.json). Default invocations remain stdlib-only.
 
+POST the validated array to a Make.com webhook (single-shot, HTTPS only):
+
+```bash
+python quizify_csv_ingest.py docs/quizify-submissions.csv \
+  --validate --post-url "https://hook.eu1.make.com/<id>" \
+  --header "Authorization: Bearer $TOKEN" --timeout 30
+```
+
+Exit codes: `1` = schema validation, `2` = argparse rejection, `3` = HTTP/network failure (categorical PII-safe stderr).
+
 ## CLI reference
 
 `csv_path` is a positional argument: the path to a Quizify CSV export
