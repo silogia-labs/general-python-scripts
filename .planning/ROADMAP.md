@@ -44,7 +44,9 @@
   2. `iter_rows()` yields one dict per CSV row; nothing accumulates the full list inside the generator path.
   3. `_HttpPostSink` exists as a stub that raises `NotImplementedError` if invoked; argparse exposes a mutually-exclusive `-o`/`--post-url` group.
   4. All 94 v1.1 tests still pass; D-11 README ten-section drift test (2/2) stays green; no new Python runtime dependencies (D-13 preserved).
-**Plans**: TBD
+**Plans:** 2 plans
+  - [ ] 07-01-PLAN.md — Test scaffolding (RED): byte-identity capsys twin + sink-layer tests + README CLI table row for --post-url.
+  - [ ] 07-02-PLAN.md — Refactor (GREEN): extract iter_rows + sink Protocol + _HttpPostSink stub; argparse mutex group; convert() rewrite.
 
 ### Phase 8: STREAM-01 NDJSON Output
 **Goal**: Operators emitting to a file can opt into line-delimited JSON output with per-row schema validation and atomic-write guarantees, without changing default-mode behavior.
