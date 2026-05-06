@@ -1,0 +1,9 @@
+{
+  "email": "test@example.com",
+  "firstName": "Test",
+  "lastName": "User",
+  "pain_intensity": 2,
+  "stress_level": 2,
+  "sleep_quality": "buena",
+  "tags": []
+}

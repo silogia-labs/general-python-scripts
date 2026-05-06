@@ -1,0 +1,10 @@
+{
+  "name": "quizify-make-scripts",
+  "version": "0.0.0",
+  "private": true,
+  "scripts": {
+    "test": "node --test"
+  },
+  "dependencies": {},
+  "devDependencies": {}
+}

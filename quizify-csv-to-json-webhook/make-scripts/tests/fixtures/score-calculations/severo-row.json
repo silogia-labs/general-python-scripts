@@ -1,0 +1,13 @@
+{
+  "email": "test@example.com",
+  "firstName": "Test",
+  "lastName": "User",
+  "pain_intensity": 9,
+  "pain_duration": "más de 12 meses",
+  "pelvic_floor_symptoms": ["a", "b", "c"],
+  "functional_limitations": ["x", "y", "z"],
+  "flare_triggers": ["t1", "t2", "t3"],
+  "stress_level": 9,
+  "sleep_quality": "mala",
+  "tags": []
+}
