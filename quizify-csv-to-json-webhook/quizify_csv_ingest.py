@@ -195,12 +195,21 @@ class _ValidatingSink:
         self._inner.close()
 
 
-def _select_sink(output: Path | None, post_url: str | None) -> _Sink:
-    """D-07-11: Argparse mutex guarantees output and post_url are not both set."""
-    if post_url is not None:
-        return _HttpPostSink(post_url)
-    if output is not None:
-        return _FileSink(output)
+def _select_sink(args: argparse.Namespace, schema_path: Path | None = None) -> _Sink:
+    """D-07-11 / D-08-12: select sink based on argparse Namespace.
+
+    Argparse post-parse checks guarantee: ``args.ndjson`` implies
+    ``args.output is not None and args.post_url is None``.
+    """
+    if args.post_url is not None:
+        return _HttpPostSink(args.post_url)
+    if getattr(args, "ndjson", False) and args.output is not None:
+        inner = _NdjsonFileSink(args.output)
+        if getattr(args, "validate", False):
+            return _ValidatingSink(inner, schema_path if schema_path is not None else SCHEMA_PATH)
+        return inner
+    if args.output is not None:
+        return _FileSink(args.output)
     return _StdoutSink()
 
 
@@ -663,8 +672,52 @@ def convert(
     quiz_title: str,
     validate: bool = False,
     post_url: str | None = None,
+    ndjson: bool = False,
 ) -> int:
-    """Phase 7 refactor: iter_rows + sink dispatch. Default behavior unchanged."""
+    """Phase 7 refactor + Phase 8 NDJSON: iter_rows + sink dispatch.
+
+    Default array-mode path (no --ndjson) is preserved EXACTLY so TRAIL-03
+    byte-identity stays green. NDJSON-mode streams via ``with sink:`` —
+    no list() materialization (T-RESOURCE-01 follow-through).
+    """
+    # Build a minimal Namespace for _select_sink (D-08-12).
+    sink_args = argparse.Namespace(
+        output=output, post_url=post_url, ndjson=ndjson, validate=validate,
+    )
+
+    if ndjson:
+        # Phase 8 NDJSON streaming path. iter_rows errors surface inside the
+        # for-loop on first __next__; catch them around the with-block.
+        try:
+            sink = _select_sink(sink_args)
+        except ImportError:
+            # D-06-19 single-sourced template (matches _run_schema_validation
+            # at line ~525) — fastjsonschema missing-extra path for --validate.
+            print(
+                "ERROR --validate requires fastjsonschema; install with: pip install '.[validate]'",
+                file=sys.stderr,
+            )
+            return 1
+        stream = iter_rows(path, trailer, quiz_title)
+        try:
+            with sink:
+                for row in stream:
+                    sink.write(row)
+        except _EmptyCsvError:
+            logging.error("CSV is empty")
+            return 1
+        except LayoutError as err:
+            logging.error("%s", err)
+            return 1
+        except OSError as err:
+            logging.error("cannot open CSV: %s", err)
+            return 1
+        except _RowValidationError as exc:
+            print(exc.pointer_message, file=sys.stderr)
+            return 1
+        return stream.exit_code
+
+    # Default array-mode path — preserved EXACTLY (TRAIL-03 byte-identity).
     stream = iter_rows(path, trailer, quiz_title)
     try:
         results = list(stream)
@@ -684,7 +737,7 @@ def convert(
         if rc != 0:
             return rc
 
-    sink = _select_sink(output, post_url)
+    sink = _select_sink(sink_args)
     try:
         for row in results:
             sink.write(row)
@@ -720,7 +773,18 @@ def main(argv: list[str] | None = None) -> int:
         default=None,
         help='Quiz title; falls back to $QUIZIFY_QUIZ_TITLE env var, then "". Decoded via html.unescape.',
     )
+    parser.add_argument(
+        "--ndjson",
+        action="store_true",
+        help="Emit line-delimited JSON; requires -o/--output, mutually exclusive with --post-url.",
+    )
     args = parser.parse_args(argv)
+
+    # D-08-11: post-parse mutex checks (locked categorical messages, T-PII-01).
+    if args.ndjson and args.post_url:
+        parser.error("--ndjson cannot be combined with --post-url")
+    if args.ndjson and not args.output:
+        parser.error("--ndjson requires -o/--output (no stdout NDJSON)")
 
     quiz_title = _resolve_quiz_title(args, os.environ)
 
@@ -739,7 +803,7 @@ def main(argv: list[str] | None = None) -> int:
 
     return convert(
         args.csv_path, trailer_override, args.output, quiz_title,
-        validate=args.validate, post_url=args.post_url,
+        validate=args.validate, post_url=args.post_url, ndjson=args.ndjson,
     )
 
 

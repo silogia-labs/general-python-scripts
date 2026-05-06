@@ -96,16 +96,24 @@ def test_post_url_with_real_csv_raises_not_implemented(sample_csv_path) -> None:
 # _select_sink factory dispatch (D-07-11)
 # ---------------------------------------------------------------------------
 
+def _ns(output=None, post_url=None, ndjson=False, validate=False):
+    """Build a minimal argparse.Namespace for _select_sink (D-08-12 signature)."""
+    import argparse
+    return argparse.Namespace(
+        output=output, post_url=post_url, ndjson=ndjson, validate=validate,
+    )
+
+
 def test_select_sink_returns_stdout_sink_when_neither_set() -> None:
-    assert isinstance(_select_sink(None, None), _StdoutSink)
+    assert isinstance(_select_sink(_ns()), _StdoutSink)
 
 
 def test_select_sink_returns_file_sink_when_output_set(tmp_path) -> None:
-    assert isinstance(_select_sink(tmp_path / "x.json", None), _FileSink)
+    assert isinstance(_select_sink(_ns(output=tmp_path / "x.json")), _FileSink)
 
 
 def test_select_sink_returns_http_post_sink_when_post_url_set() -> None:
-    assert isinstance(_select_sink(None, "https://example.test/h"), _HttpPostSink)
+    assert isinstance(_select_sink(_ns(post_url="https://example.test/h")), _HttpPostSink)
 
 
 # ---------------------------------------------------------------------------
