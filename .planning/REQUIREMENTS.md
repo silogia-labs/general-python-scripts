@@ -55,4 +55,25 @@ Locked deferral: NDJSON+POST cross-product is **out of scope for v1.2** (v1.3 ca
 
 ## Traceability
 
-(Filled by the roadmapper.)
+| Requirement      | Phase    | Status  |
+|------------------|----------|---------|
+| REFACTOR-01      | Phase 7  | Pending |
+| STREAM-01        | Phase 8  | Pending |
+| STREAM-02        | Phase 8  | Pending |
+| STREAM-03        | Phase 8  | Pending |
+| STREAM-04        | Phase 8  | Pending |
+| AUTO-01          | Phase 9  | Pending |
+| AUTO-02          | Phase 9  | Pending |
+| AUTO-03          | Phase 9  | Pending |
+| AUTO-04          | Phase 9  | Pending |
+| AUTO-05          | Phase 9  | Pending |
+| AUTO-06          | Phase 9  | Pending |
+| MAKE-COSMETIC-01 | Phase 10 | Pending |
+| MAKE-COSMETIC-02 | Phase 10 | Pending |
+| MAKE-TEST-01     | Phase 10 | Pending |
+| MAKE-TEST-02     | Phase 10 | Pending |
+| MAKE-TEST-03     | Phase 10 | Pending |
+
+**Coverage:** 16/16 v1.2 requirements mapped (REFACTOR=1, STREAM=4, AUTO=6, MAKE=5). No orphans, no duplicates.
+
+**Phase ordering rationale:** Phase 7 (refactor scaffolding) lands as a no-op to de-risk Phases 8-9. Phase 8 must precede Phase 9 — the sink contract + per-row validation primitives proven by NDJSON are reused by AUTO-01's pre-egress validation gate. Phase 10 is fully independent of Phases 7-9 (no shared Python code paths) and is parallel-safe from day 1.
