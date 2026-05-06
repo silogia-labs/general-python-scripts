@@ -1,3 +1,5 @@
+"use strict";
+
 const SCORE_RULES = {
     painIntensity: {
         high: 7,  // >= 7 → 2 points
@@ -166,131 +168,136 @@ function calculateContextProfile({
 
 // ====== MAIN INPUT ======
 
-// Map this input variable to the previous Code module output
-const data = input.data || {};
+function mapRecord(record) {
+    const data = record || {};
 
-// Shallow clone so we keep all original mapped fields
-const out = { ...data };
+    // Shallow clone so we keep all original mapped fields
+    const out = { ...data };
 
-// Normalized tags (always an array)
-const tags = Array.isArray(data.tags) ? data.tags : [];
-
-
-// ====== SCORE COMPONENTS ======
-
-const score_pain_intensity = scorePainIntensity(data.pain_intensity);
-const score_pain_duration = scorePainDuration(data.pain_duration);
-const score_pelvic_floor = scoreCountArray(
-    data.pelvic_floor_symptoms,
-    SCORE_RULES.pelvicSymptoms
-);
-const score_functional_limitations = scoreCountArray(
-    data.functional_limitations,
-    SCORE_RULES.functionalLimitations
-);
-const score_flare_triggers = scoreCountArray(
-    data.flare_triggers,
-    SCORE_RULES.flareTriggers
-);
-const score_stress = scoreStressLevel(data.stress_level);
-const score_sleep = scoreSleepQuality(data.sleep_quality || data.sleepQuality);
-
-const score_total =
-    score_pain_intensity +
-    score_pain_duration +
-    score_pelvic_floor +
-    score_functional_limitations +
-    score_flare_triggers +
-    score_stress +
-    score_sleep;
-
-const score_level = classifyTotalScore(score_total);
+    // Normalized tags (always an array)
+    const tags = Array.isArray(data.tags) ? data.tags : [];
 
 
-// ====== PROFILE DETERMINATION ======
+    // ====== SCORE COMPONENTS ======
 
-const is_postpartum = hasTag(tags, "postpartum");
-const is_peri_meno = hasTag(tags, "peri_menu");
-const is_menstrual = hasTag(tags, "menstrual");
+    const score_pain_intensity = scorePainIntensity(data.pain_intensity);
+    const score_pain_duration = scorePainDuration(data.pain_duration);
+    const score_pelvic_floor = scoreCountArray(
+        data.pelvic_floor_symptoms,
+        SCORE_RULES.pelvicSymptoms
+    );
+    const score_functional_limitations = scoreCountArray(
+        data.functional_limitations,
+        SCORE_RULES.functionalLimitations
+    );
+    const score_flare_triggers = scoreCountArray(
+        data.flare_triggers,
+        SCORE_RULES.flareTriggers
+    );
+    const score_stress = scoreStressLevel(data.stress_level);
+    const score_sleep = scoreSleepQuality(data.sleep_quality || data.sleepQuality);
 
-// Clinical complexity profile
-let profile = "profile_base";
-let email_template_id = "9199514";
+    const score_total =
+        score_pain_intensity +
+        score_pain_duration +
+        score_pelvic_floor +
+        score_functional_limitations +
+        score_flare_triggers +
+        score_stress +
+        score_sleep;
 
-if (data.has_red_flags) {
-    profile = "red_flags";
-} else {
-    if (score_level === "severo") {
-        profile = "high_complexity";
-        email_template_id = "9199525";
-    } else if (score_level === "moderado") {
-        profile = "moderate_complexity";
-        email_template_id = "9199522";
+    const score_level = classifyTotalScore(score_total);
+
+
+    // ====== PROFILE DETERMINATION ======
+
+    const is_postpartum = hasTag(tags, "postpartum");
+    const is_peri_meno = hasTag(tags, "peri_menu");
+    const is_menstrual = hasTag(tags, "menstrual");
+
+    // Clinical complexity profile
+    let profile = "profile_base";
+    let email_template_id = "9199514";
+
+    if (data.has_red_flags) {
+        profile = "red_flags";
     } else {
-        profile = "low_complexity";
-        email_template_id = "9199514";
+        if (score_level === "severo") {
+            profile = "high_complexity";
+            email_template_id = "9199525";
+        } else if (score_level === "moderado") {
+            profile = "moderate_complexity";
+            email_template_id = "9199522";
+        } else {
+            profile = "low_complexity";
+            email_template_id = "9199514";
+        }
     }
+
+
+    // Life-stage refinement (optional: mostly descriptive)
+    let life_stage = "life_stage_unspecified";
+    if (is_postpartum) {
+        life_stage = "postpartum";
+    } else if (is_peri_meno) {
+        life_stage = "peri_menopause_menopause";
+    } else if (is_menstrual) {
+        life_stage = "menstrual_cycle_active";
+    }
+
+    // Activity profile (simple)
+    let activity_profile = "non_athlete";
+    if (data.is_athlete) {
+        activity_profile = "athlete";
+    }
+
+    // NEW: context profile (Hogar / Doble jornada / Minería / Senior / Atleta)
+    const context_profile = calculateContextProfile({
+        age_range: data.age_range,
+        work_shift_type: data.work_shift_type,
+        functional_limitations: data.functional_limitations,
+        sport_level: data.sport_level,
+        is_athlete: data.is_athlete,
+        tags
+    });
+
+    out.score_pain_intensity = score_pain_intensity;
+    out.score_pain_duration = score_pain_duration;
+    out.score_pelvic_floor = score_pelvic_floor;
+    out.score_functional_limitations = score_functional_limitations;
+    out.score_flare_triggers = score_flare_triggers;
+    out.score_stress = score_stress;
+    out.score_sleep = score_sleep;
+
+    out.score_total = score_total;
+    out.score_level = score_level;
+
+    out.profile = profile;
+    out.life_stage_profile = life_stage;
+    out.activity_profile = activity_profile;
+    out.context_profile = context_profile;
+
+    tags.push(life_stage)
+    tags.push(profile)
+    tags.push(activity_profile)
+    tags.push(context_profile)
+
+    out.email_template_id = "9199514"
+
+    if (score_level === "severo") {
+        out.email_template_id = "9199525";
+    } else if (score_level === "moderado") {
+        out.email_template_id = "9199522";
+    } else {
+        out.email_template_id = "9199514";
+    }
+
+    // keep tags as-is so Airtable mapping still works
+    out.tags = tags;
+
+    return out;
 }
 
-
-// Life-stage refinement (optional: mostly descriptive)
-let life_stage = "life_stage_unspecified";
-if (is_postpartum) {
-    life_stage = "postpartum";
-} else if (is_peri_meno) {
-    life_stage = "peri_menopause_menopause";
-} else if (is_menstrual) {
-    life_stage = "menstrual_cycle_active";
-}
-
-// Activity profile (simple)
-let activity_profile = "non_athlete";
-if (data.is_athlete) {
-    activity_profile = "athlete";
-}
-
-// NEW: context profile (Hogar / Doble jornada / Minería / Senior / Atleta)
-const context_profile = calculateContextProfile({
-    age_range: data.age_range,
-    work_shift_type: data.work_shift_type,
-    functional_limitations: data.functional_limitations,
-    sport_level: data.sport_level,
-    is_athlete: data.is_athlete,
-    tags
-});
-
-out.score_pain_intensity = score_pain_intensity;
-out.score_pain_duration = score_pain_duration;
-out.score_pelvic_floor = score_pelvic_floor;
-out.score_functional_limitations = score_functional_limitations;
-out.score_flare_triggers = score_flare_triggers;
-out.score_stress = score_stress;
-out.score_sleep = score_sleep;
-
-out.score_total = score_total;
-out.score_level = score_level;
-
-out.profile = profile;
-out.life_stage_profile = life_stage;
-out.activity_profile = activity_profile;
-out.context_profile = context_profile;
-
-tags.push(life_stage)
-tags.push(profile)
-tags.push(activity_profile)
-tags.push(context_profile)
-
-out.email_template_id = "9199514"
-
-if (score_level === "severo") {
-    out.email_template_id = "9199525";
-} else if (score_level === "moderado") {
-    out.email_template_id = "9199522";
-} else {
-    out.email_template_id = "9199514";
-}
-
-// keep tags as-is so Airtable mapping still works
-out.tags = tags;
-
-return out;
+// === DUAL-EXPORT FOOTER (D-10-02) ===
+if (typeof input !== "undefined") { output = mapRecord(input.data || {}); }
+if (typeof module !== "undefined") { module.exports = { mapRecord }; }

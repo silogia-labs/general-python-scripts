@@ -1,3 +1,5 @@
+"use strict";
+
 // === CONFIG: map Quizify text -> internal field keys & types ===
 // field_type: "single" or "multi_select"
 const QUESTION_CONFIG = {
@@ -87,100 +89,109 @@ function extractAnswer(record, index, fieldType) {
 
 
 // === MAIN ===
-const raw = input.quiz_response;
-const record = Array.isArray(raw) ? raw[0] : raw;
+function mapRecord(record) {
+    record = record || {};
 
-// Base output
-const output = {
-    email: record.email || null,
-    firstName: record.firstName || null,
-    lastName: record.lastName || null,
-    phone: record.phone || null,
-    status: record.status || null,
-    statusDate: record.statusDate || null,
-    quiz_title: record.quiz_title || null,
-    product_recommendation: record["product-recommendation"] || null,
-    title: record.title || null,
-    type_page_url: record["type-page-url"] || null,
-    tags: [] // final merged tags go here
-};
-
-
-// === PROCESS QUESTIONS ===
-Object.keys(record).forEach(key => {
-    const match = key.match(/^question-(\d+)$/);
-    if (!match) return;
-
-    const index = match[1];
-    const questionText = record[key];
-    const cfg = QUESTION_CONFIG[questionText];
-    if (!cfg) return;
-
-    const { field, tagsField, field_type } = cfg;
-    const { value, tags } = extractAnswer(record, index, field_type);
-
-    // map main
-    output[field] = value;
-
-    // map raw tags from Quizify
-    if (tags) output.tags.push(tags);
-
-    // mapped tag field
-    if (tagsField && tags) output[tagsField] = tags;
-});
+    // Base output
+    const output = {
+        email: record.email || null,
+        firstName: record.firstName || null,
+        lastName: record.lastName || null,
+        phone: record.phone || null,
+        status: record.status || null,
+        statusDate: record.statusDate || null,
+        quiz_title: record.quiz_title || null,
+        product_recommendation: record["product-recommendation"] || null,
+        title: record.title || null,
+        type_page_url: record["type-page-url"] || null,
+        tags: [] // final merged tags go here
+    };
 
 
-// === DERIVED TAGS LOGIC ===
-function add(tag) {
-    if (!output.tags.includes(tag)) output.tags.push(tag);
-}
+    // === PROCESS QUESTIONS ===
+    Object.keys(record).forEach(key => {
+        const match = key.match(/^question-(\d+)$/);
+        if (!match) return;
 
-function process_multi_select_tag(answer_array, noneValue, tag_name) {
-    output[tag_name] = false;
-    const has_value = answer_array.length == 1 && answer_array[0] != noneValue;
-    if (has_value) {
-        add(tag_name);
-        output[tag_name] = true;
+        const index = match[1];
+        const questionText = record[key];
+        const cfg = QUESTION_CONFIG[questionText];
+        if (!cfg) return;
+
+        const { field, tagsField, field_type } = cfg;
+        const { value, tags } = extractAnswer(record, index, field_type);
+
+        // map main
+        output[field] = value;
+
+        // map raw tags from Quizify
+        if (tags) output.tags.push(tags);
+
+        // mapped tag field
+        if (tagsField && tags) output[tagsField] = tags;
+    });
+
+
+    // === DERIVED TAGS LOGIC ===
+    function add(tag) {
+        if (!output.tags.includes(tag)) output.tags.push(tag);
     }
-}
 
-function process_filter_tag(answer_value, filter_value, tag_name) {
-    const falg_name = `is_${tag_name}`;
-    output[falg_name] = false;
-    const has_value = answer_value && answer_value.toLowerCase().includes(filter_value);
-    if (has_value) {
-        add(tag_name);
-        output[falg_name] = true;
+    function process_multi_select_tag(answer_array, noneValue, tag_name) {
+        output[tag_name] = false;
+        const has_value = Array.isArray(answer_array) && answer_array.length == 1 && answer_array[0] != noneValue;
+        if (has_value) {
+            add(tag_name);
+            output[tag_name] = true;
+        }
     }
+
+    function process_filter_tag(answer_value, filter_value, tag_name) {
+        const falg_name = `is_${tag_name}`;
+        output[falg_name] = false;
+        const has_value = answer_value && answer_value.toLowerCase().includes(filter_value);
+        if (has_value) {
+            add(tag_name);
+            output[falg_name] = true;
+        }
+    }
+
+    process_multi_select_tag(output.red_flags_answer, "Ninguno", "has_red_flags")
+    process_multi_select_tag(output.flare_triggers, "Ninguno", "has_triggers")
+    process_multi_select_tag(output.functional_limitations, "Ninguna", "has_limitations")
+    process_multi_select_tag(output.pelvic_floor_symptoms, "Ninguno", "has_pelvic_symptoms")
+
+    process_filter_tag(output.sport_level, "alto", "athlete")
+    process_filter_tag(output.work_shift_type, "hogar", "hogar")
+    process_filter_tag(output.menstrual_cycle, "menstrual", "menstrual")
+    process_filter_tag(output.pregnancy_history, "postpartum", "postpartum")
+    process_filter_tag(output.menopause_status, "peri", "peri_menu")
+
+    // Consent
+    if (output.consent_answer && output.consent_answer.toLowerCase().includes("sí")) {
+        add("consent_given");
+        output["consent_given"] = true
+    }
+
+    // Deduplicate
+    output.tags = [...new Set(output.tags)];
+
+
+    if (output.email && (output.email.toLowerCase().includes("silverpaezp") || output.email.toLowerCase().includes("iranipaez"))) {
+        let min = 1000;
+        let max = 9999;
+        let rand = Math.floor(Math.random() * (max - min + 1)) + min;
+        let email_split = output.email.split('@');
+        output.email = email_split[0] + '+' + rand + '@' + email_split[1];
+    }
+
+    return output;
 }
 
-process_multi_select_tag(output.red_flags_answer, "Ninguno", "has_red_flags")
-process_multi_select_tag(output.flare_triggers, "Ninguno", "has_triggers")
-process_multi_select_tag(output.functional_limitations, "Ninguna", "has_limitations")
-process_multi_select_tag(output.pelvic_floor_symptoms, "Ninguno", "has_pelvic_symptoms")
-
-process_filter_tag(output.sport_level, "alto", "athlete")
-process_filter_tag(output.work_shift_type, "hogar", "hogar")
-process_filter_tag(output.menstrual_cycle, "menstrual", "menstrual")
-process_filter_tag(output.pregnancy_history, "postpartum", "postpartum")
-process_filter_tag(output.menopause_status, "peri", "peri_menu")
-
-// Consent
-if (output.consent_answer && output.consent_answer.toLowerCase().includes("sí")) {
-    add("consent_given");
-    output["consent_given"] = true
+// === DUAL-EXPORT FOOTER (D-10-02) ===
+if (typeof input !== "undefined") {
+    const raw = input.quiz_response;
+    const record = Array.isArray(raw) ? raw[0] : raw;
+    output = mapRecord(record);
 }
-
-// Deduplicate
-output.tags = [...new Set(output.tags)];
-
-
-if (output.email.toLowerCase().includes("silverpaezp") || output.email.toLowerCase().includes("iranipaez")) {
-    let min = 1000;
-    let max = 9999;
-    let rand = Math.floor(Math.random() * (max - min + 1)) + min;
-    let email_split = output.email.split('@');
-    output.email = email_split[0] + '+' + rand + '@' + email_split[1];
-}
-
-return output;
+if (typeof module !== "undefined") { module.exports = { mapRecord }; }
