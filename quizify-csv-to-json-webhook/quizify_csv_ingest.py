@@ -158,6 +158,43 @@ class _RowValidationError(Exception):
         super().__init__(pointer_message)
 
 
+class _ValidatingSink:
+    """D-08-05 decorator: per-row schema validation wrapping any inner _Sink.
+
+    Lazy-imports fastjsonschema (D-13 / D-06-17 / Pitfall 18); compiles
+    ``schema['items']`` exactly once (D-06-18 / D-08-08). On the first
+    failure raises ``_RowValidationError`` — which propagates through the
+    inner sink's ``__exit__`` (cleaning up its .tmp).
+    """
+    def __init__(self, inner: "_Sink", schema_path: Path):
+        import fastjsonschema  # lazy, D-13 / D-06-17 / Pitfall 18
+        schema = json.loads(schema_path.read_text(encoding="utf-8"))
+        self._validate_one = fastjsonschema.compile(schema["items"])  # D-06-18 / D-08-08
+        self._inner = inner
+        self._idx = 0
+
+    def __enter__(self):
+        self._inner.__enter__()
+        return self
+
+    def write(self, row: dict) -> None:
+        try:
+            self._validate_one(row)
+        except Exception as exc:  # JsonSchemaValueException — Pitfall 17 categorical catch
+            raise _RowValidationError(
+                self._idx,
+                _format_validation_error(exc, row_idx=self._idx),
+            ) from None
+        self._inner.write(row)
+        self._idx += 1
+
+    def __exit__(self, exc_type, exc, tb):
+        return self._inner.__exit__(exc_type, exc, tb)
+
+    def close(self) -> None:
+        self._inner.close()
+
+
 def _select_sink(output: Path | None, post_url: str | None) -> _Sink:
     """D-07-11: Argparse mutex guarantees output and post_url are not both set."""
     if post_url is not None:
@@ -546,7 +583,7 @@ def dry_run(path: Path, trailer: tuple[str, ...] | None) -> int:
     return 0
 
 
-def _format_validation_error(err) -> str:
+def _format_validation_error(err, row_idx: int | None = None) -> str:
     """Format a fastjsonschema.JsonSchemaValueException → D-06-20 PII-safe stderr.
 
     Uses ONLY categorical attributes — NEVER `err.message` / `err.value` / `str(err)`,
@@ -559,6 +596,10 @@ def _format_validation_error(err) -> str:
       type(err.value)   : Python type — yields 'str'/'int'/'NoneType'/'list'/'dict'.
     """
     pointer = "/" + "/".join(err.path[1:]) if len(err.path) > 1 else "/"
+    if row_idx is not None:
+        # D-08-06 / RFC 6901: row-prefixed JSON Pointer for per-row mode.
+        # Root-level error -> "/<idx>"; nested -> "/<idx>/<rest>".
+        pointer = f"/{row_idx}" if pointer == "/" else f"/{row_idx}{pointer}"
     expected = (err.definition or {}).get("type", "<unknown>")
     if isinstance(expected, list):  # union type, e.g. ["string", "null"]
         expected = "|".join(expected)
