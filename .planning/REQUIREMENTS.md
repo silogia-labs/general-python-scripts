@@ -1,0 +1,58 @@
+# v1.2 Requirements — Delivery & Make.com Hygiene
+
+Scoped requirements for milestone v1.2 of the Quizify CSV → Webhook JSON initiative. Closes the v1.1 deferred bucket: HTTP POST delivery, NDJSON streaming, Make.com JS housekeeping + Node test harness.
+
+Locked deferral: NDJSON+POST cross-product is **out of scope for v1.2** (v1.3 candidate). v1.2 supports the matrix `{array+POST, array+file, NDJSON+file}` only.
+
+## v1.2 Requirements
+
+### Delivery — HTTP POST (AUTO)
+
+- [ ] **AUTO-01** — User can deliver the JSON payload directly to a webhook via `--post-url URL` (single-shot POST of array body; mutually exclusive with `-o/--output` via argparse).
+- [ ] **AUTO-02** — `--post-url` requires `--validate`; argparse exits 2 with categorical stderr if violated (no schema-invalid payloads on the wire).
+- [ ] **AUTO-03** — Repeatable `--header "K: V"` for auth/custom headers; CRLF in values rejected at argparse.
+- [ ] **AUTO-04** — `--timeout SECONDS` (default 30); timeout errors exit code `3` with PII-safe stderr.
+- [ ] **AUTO-05** — HTTPS-only (rejected at argparse); default `ssl.create_default_context()`; no cross-host redirects (custom opener); CI grep gate on `CERT_NONE` / `_create_unverified_context` / `verify=False`.
+- [ ] **AUTO-06** — Non-2xx responses exit `3` with categorical-only stderr (status code + reason class + body byte count); never response body content. Locked as D-06-2x templates; `TestHTTPErrorPIIsafe` negative-substring tests against `quizify-submissions.csv`-derived synthetic fixtures.
+
+### Streaming (STREAM)
+
+- [ ] **STREAM-01** — `--ndjson` boolean flag enables line-delimited JSON output; file-mode target only (`-o file.ndjson`); argparse rejects `--ndjson` + `--post-url`.
+- [ ] **STREAM-02** — Line separator is `\n` (open with `newline="\n"` to defeat Windows CRLF translation); one row per line, one trailing `\n` per emitted row.
+- [ ] **STREAM-03** — `--ndjson` + `--validate` validates each row against `schema["items"]` (compiled once); first failure exits 1 with categorical JSON Pointer.
+- [ ] **STREAM-04** — NDJSON file output is atomic: write to `.tmp` sibling, then `os.replace()`; mid-stream SIGINT leaves no partial file at the target path (verified by SIGINT test).
+
+### Refactor & Regression Lock (REFACTOR)
+
+- [ ] **REFACTOR-01** — `convert()` refactored to use `iter_rows()` generator + sink abstraction (`_StdoutSink` / `_FileSink` / `_HttpPostSink`); default-flag invocation produces byte-identical output to v1.1 (golden-fixture regression test parallel to TRAIL-03).
+
+### Make.com JS Hygiene (MAKE)
+
+- [ ] **MAKE-COSMETIC-01** — `Reomoto` typo at `score-calculations.js:157` → `Remoto`. Phase entry gate: verify not load-bearing in historical exports.
+- [ ] **MAKE-COSMETIC-02** — Dead `profile = "profile_base"` initializer at `score-calculations.js:217` removed. Phase entry gate: verify variable genuinely unread.
+- [ ] **MAKE-TEST-01** — `make-scripts/` gains `node --test` harness (zero deps, locked empty `dependencies`/`devDependencies` via CI gate) covering MAKE-COSMETIC-01/02 + regression for CONTRACT-01, MAKE-FIX-01, MAKE-FIX-02.
+- [ ] **MAKE-TEST-02** — JS modules expose pure `mapRecord(record)` function; `module.exports` conditional on `typeof module !== "undefined"` so deployed Make.com files paste in unchanged. `"use strict";` at top of every JS module; `globalThis` snapshot test detects accidental global writes.
+- [ ] **MAKE-TEST-03** — `pyproject.toml` `[tool.pytest.ini_options]` adds `norecursedirs = ["make-scripts", "node_modules"]`; `make-scripts/.gitignore` blocks `node_modules/` and `coverage/`.
+
+## Future Requirements (deferred to v1.3+)
+
+- **NDJSON+POST cross-product** — partial-success semantics need design before any v1.3 plan; Make.com webhook content-type is `application/json` of an array, not `application/x-ndjson`.
+- **`--retry N` exponential backoff** — Make.com idempotency unverified; default fail-fast in v1.2.
+- **`--idempotency-key`** — Make.com idempotency-key support unverified.
+- **`$QUIZIFY_WEBHOOK_URL` / `--post-url-env`** — defer unless operator pain reported; meanwhile log host-only (never full URL).
+
+## Out of Scope
+
+| Feature | Reason |
+|---------|--------|
+| OAuth / built-in auth flows | `--header "Authorization: Bearer …"` collapses every realistic auth scheme |
+| Persistent retry queue | Out of utility-script scope |
+| Multi-URL fan-out | Single endpoint per invocation |
+| RFC 7464 JSON Text Sequences | NDJSON is the dominant ecosystem standard |
+| Vitest / Jest / Mocha for `make-scripts/` | `node:test` is sufficient; supply-chain footprint unjustified |
+| `--post-body-from-file` | CSV is the source of truth |
+| Top-level repo `package.json` | Repo is multi-tool Python; keep Node scoped to `make-scripts/` |
+
+## Traceability
+
+(Filled by the roadmapper.)
