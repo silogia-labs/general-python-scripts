@@ -1,203 +1,185 @@
-# Stack Research
+# Stack Research — v1.2 Delivery & Make.com Hygiene
 
-**Domain:** Python CLI utility — JSON Schema validation layer (v1.1 additions only)
-**Researched:** 2026-05-03
-**Confidence:** HIGH (library versions verified via PyPI; Python compat verified via package metadata)
+**Domain:** CLI utility (Python stdlib-only) + co-owned Make.com IIFE JS modules
+**Researched:** 2026-05-05
+**Confidence:** HIGH (Python additions); HIGH (Node test runner choice)
 
----
+## TL;DR — Net Stack Delta for v1.2
 
-## Scope
+| Concern | Decision | Net change |
+|---------|----------|------------|
+| AUTO-01 — HTTP POST delivery | Use `urllib.request` + `urllib.error` from stdlib; hand-rolled retry/backoff in ~30-50 LOC inside `quizify_csv_ingest.py` | **Zero new runtime deps** (D-13 preserved) |
+| STREAM-01 — NDJSON streaming | Hand-rolled NDJSON writer using `json.dumps(row, ensure_ascii=False)` per line; gated behind a new `--emit-format ndjson` flag | **Zero new runtime deps** |
+| MAKE-TEST-01 — JS test harness | `node:test` built-in (Node 20+; Node 22 LTS preferred) + `node:assert/strict` | **Zero new npm runtime deps**; `package.json` optional and devDeps-free |
 
-This file covers ONLY stack additions/changes needed for v1.1. The v1.0 baseline (Python 3.7+, stdlib runtime, pytest dev-only) is already validated and is not re-researched here. Three of the four v1.1 features require NO stack changes; one (VALI-01) requires a key decision on a first runtime dependency.
-
----
-
-## Feature-by-Feature Stack Analysis
-
-### VALI-01 — Opt-in JSON Schema validation (`--validate` flag)
-
-This is the only feature that touches the dependency graph. All other v1.1 features are pure code changes.
-
-#### Options compared
-
-**Option A: `fastjsonschema` 2.21.2**
-
-- Requires Python 3.3+ (no lower bound specified in package metadata; `requires_python` is `None`, meaning no constraint at all). Confirmed compatible with 3.7+.
-- Zero transitive runtime dependencies. Single-file install.
-- Compiles the schema to a Python function at import/startup time via `fastjsonschema.compile(schema)`. Subsequent calls are function calls, not schema walks.
-- Supports JSON Schema Draft 04, 06, and 07. Draft-07 is sufficient for this schema (no `$defs`, no `unevaluatedProperties`, no 2020-12 features needed).
-- The compiled validator raises `fastjsonschema.JsonSchemaValueException` on failure, which carries the path and value.
-- Performance advantage is irrelevant at this scale (42 rows), but the zero-transitive-dep property directly serves the project constraint "add dependencies only when justified."
-
-**Option B: `jsonschema` 4.17.3 (last Python 3.7-compatible release)**
-
-- `requires_python: >=3.7` confirmed for 4.17.3. Version 4.18.0 raised floor to `>=3.8`.
-- Runtime transitive deps at 4.17.3: `attrs>=17.4.0`, `pyrsistent>=0.14.0`, plus conditional backport shims (`importlib-metadata`, `importlib-resources`, `pkgutil-resolve-name`, `typing-extensions`) on Python < 3.8 or < 3.9.
-- That is 2 mandatory non-stdlib packages (attrs, pyrsistent) plus up to 4 conditional ones. This turns a "add one dep" decision into "add 2-6 packages."
-- `pyrsistent` is a C-extension with optional native acceleration — it has a pure-Python fallback but adds build complexity.
-- The richer API (error iterators, `best_match`, format checking) offers no value for this use case: we validate the locked JSON envelope structure (key presence, types, pattern) — not human-readable diagnostics.
-- Latest (4.26.0) requires `>=3.10` and adds `rpds-py` (Rust extension). Ruled out for Python 3.7 requirement.
-
-**Option C: `python-jsonschema-objects`**
-
-- A code-generation tool that creates Python classes from a JSON Schema. Not a validator. Wrong tool category. Ruled out.
-
-**Option D: Hand-rolled validator**
-
-- The schema is structurally simple: check key presence in a fixed ordered list, check type of a few fields (`string`, nullable, array), check `question-N`/`answers-N`/`answers-tags-N` triple existence for at least N=1.
-- A hand-rolled check is ~50-80 lines of stdlib, zero deps, trivially testable, and will never require a version pin.
-- Drawback: does not produce machine-readable JSON Schema that downstream tools (AUTO-01 HTTP POST gating, API docs) can consume. If VALI-01's intent is to establish a formal schema artifact as much as a runtime gate, hand-rolling defeats that goal.
-- Appropriate only if the schema is never published or reused outside the script. Given AUTO-01 is a named v1.2 candidate that "depends on VALI-01 being in place," a formal schema file is more valuable than saving one dependency.
-
-#### Recommendation: `fastjsonschema` 2.21.2
-
-Use `fastjsonschema`. Rationale:
-
-1. Zero transitive runtime deps — preserves the spirit of the stdlib-only ethos without requiring a hard zero-deps rule.
-2. Python 3.3+ compat — no version pin gymnastics, no risk of accidental upgrade to a 3.8+-only release.
-3. Schema compile model matches this use case: compile once at process start when `--validate` is passed, then call the validator per row. No repeated schema parsing overhead.
-4. Draft-07 support covers everything needed for this schema without pulling in 2020-12 machinery.
-5. A formal JSON Schema file (Draft-07 `.json`) produced alongside the script can be read directly by Make.com, AUTO-01, or CI without any Python tooling.
-
-Do NOT use `jsonschema` 4.17.3 for this project. The 2-6 transitive dep tree is disproportionate for a validator that will only be called when the operator explicitly passes `--validate`. The version freeze at 4.17.3 also means perpetual debt: every security advisory against a newer `jsonschema` will require auditing whether the 4.17.3 line is affected.
-
-### TRAIL-01 — Name-based scoring lookup (no new library)
-
-Pure stdlib refactor. The fix is in `build_row()` at `quizify_csv_ingest.py` lines 263-265. Instead of indexing `trailer_cells_decoded[0]`, `[1]`, `[2]`, look up by the canonical column names (`"Result logic"`, `"Score category"`, `"Score value"`) using the `trailer_raw` headers that `classify_headers()` already returns. Caller already has both lists; it is a dict construction and key lookup, entirely in stdlib. No new dependency.
-
-### CONTRACT-01 — Fix `quizify-mapping.js:102` (no stack change)
-
-Single-line JS change: `record.product_result` → `record["product-recommendation"]`. No new library, no Node toolchain change, no Python dependency. The existing manual verification approach (per v1.1 decision log) is sufficient.
-
-### MAKE-FIX-01 — Peri-menopause tag mismatch + inverted `is_athlete` (no stack change)
-
-Two JS-only fixes:
-
-1. `quizify-mapping.js:167` emits tag `"peri_menu"` (underscore); `score-calculations.js:213` checks `hasTag(tags, "peri-menu")` (hyphen). Fix: align `quizify-mapping.js:167` to emit `"peri-menu"` to match the consumer.
-2. `score-calculations.js:247-250`: `activity_profile` is assigned `"athlete"` when `!data.is_athlete` — inverted condition. Fix: change `if (!data.is_athlete)` to `if (data.is_athlete)`.
-
-No new library. No Node test runner added (deferred to v1.2 per decision log). Manual verification only.
-
----
+This is the right answer because the existing v1.0/v1.1 ethos — stdlib-only at runtime, additions only when justified — applies cleanly here. None of the three v1.2 features cross the threshold that would justify importing `requests`, `httpx`, an NDJSON package, Vitest, or Jest.
 
 ## Recommended Stack
 
-### Core Technologies (unchanged from v1.0)
+### Core Technologies (Python — runtime)
 
 | Technology | Version | Purpose | Why Recommended |
 |------------|---------|---------|-----------------|
-| Python | 3.7+ | Runtime | Existing constraint; fastjsonschema 2.21.2 is compatible |
-| stdlib (`json`, `csv`, `argparse`, `html`, `os`, `pathlib`, `logging`) | bundled | All runtime logic except validation | Zero install friction |
+| Python | 3.7+ (existing floor) | Runtime | Already locked by v1.0; v1.2 adds nothing that needs newer syntax |
+| `urllib.request` (stdlib) | n/a | HTTP POST delivery (AUTO-01) | Stdlib-only at runtime is D-13. `urllib.request.Request(url, data=..., headers={"Content-Type":"application/json"}, method="POST")` + `urlopen(req, timeout=...)` covers the full POST contract. `requests`/`httpx` would buy retry/connection-pooling sugar we don't need for one-shot egress |
+| `urllib.error` (stdlib) | n/a | Error categorization for AUTO-01 | `HTTPError` (status + reason — no body needed for PII-safe logs) and `URLError` (transport — `reason` is categorical: timeout, DNS, refused) cover the entire failure surface for T-PII-01-safe logging |
+| `ssl` (stdlib) | n/a | TLS context for HTTPS POST | Default `ssl.create_default_context()` — verifies certs from system CA bundle. No flags to disable verification |
+| `json` (stdlib) | n/a | NDJSON line encoding (STREAM-01) | `json.dumps(row, ensure_ascii=False, separators=(",", ":"))` per row + `\n`. D-17 indent=2 only applies to the array-mode emit; NDJSON lines are intentionally compact. Newline is `\n` (LF), never `\r\n` |
+| `fastjsonschema` | `>=2.21.2` (already pinned) | Schema validation gate for AUTO-01 | Already shipped as the `[validate]` extra in v1.1. AUTO-01 reuses the same lazy-import path — no changes to `pyproject.toml` runtime |
 
-### New Runtime Dependency (VALI-01 only)
+### Core Technologies (JS — test-side, MAKE-TEST-01)
 
-| Library | Version | Purpose | Dep footprint |
-|---------|---------|---------|---------------|
-| `fastjsonschema` | 2.21.2 | Compile-and-call JSON Schema Draft-07 validator for `--validate` mode | Zero transitive runtime deps |
+| Technology | Version | Purpose | Why Recommended |
+|------------|---------|---------|-----------------|
+| Node.js | 20.x LTS minimum; 22.x LTS preferred | Test harness runtime | `node:test` is stable since Node 20. Node 22 LTS (Oct 2024) is the long-term floor for new tooling in 2026 |
+| `node:test` (built-in) | n/a | Test runner | Zero deps, ships with Node, watch mode + coverage + mocks built in. For two ~200 LOC IIFE modules with no framework integration, anything else is overkill (see Alternatives) |
+| `node:assert/strict` (built-in) | n/a | Assertions | Pairs with `node:test`; strict-equality semantics by default |
 
-### Development Tools (unchanged from v1.0)
+### Supporting Libraries
+
+| Library | Version | Purpose | When to Use |
+|---------|---------|---------|-------------|
+| (none) | — | — | v1.2 introduces no new runtime libraries. Existing `fastjsonschema>=2.21.2` extra remains the only optional dep |
+
+### Development Tools
 
 | Tool | Purpose | Notes |
 |------|---------|-------|
-| pytest | >=7.0 | Test runner | `requirements-dev.txt` already pins this |
+| `pytest` (existing) | Python tests | AUTO-01 + STREAM-01 tests live alongside existing 94 tests; use stdlib `http.server.BaseHTTPRequestHandler` in a thread for fake-webhook fixtures (no `responses`/`pytest-httpserver` needed) |
+| `node --test` | Run JS suite | `node --test quizify-csv-to-json-webhook/make-scripts/*.test.js`. Add `npm test` script if a minimal `package.json` is introduced; otherwise document the raw command in `make-scripts/CONVENTIONS.md` |
+| `node --test --watch` | Local TDD loop | Built-in watch mode; no nodemon needed |
+| `node --experimental-test-coverage` | Optional coverage | Stable in Node 22; only enable if tests grow beyond smoke level |
 
----
+## Integration Points with Existing CLI
+
+### AUTO-01 — argparse additions
+
+```text
+--post-url URL        Webhook URL to POST the JSON payload to (HTTPS recommended)
+--post-timeout SEC    Per-attempt timeout in seconds (default: 30)
+--post-retries N      Retry count on transient errors (default: 2; total attempts = N+1)
+```
+
+Wiring in `main()`:
+1. After `convert()` builds `results` and `--validate` returns 0, dispatch to a new `_post_payload(results, args)`.
+2. `_post_payload` does: `body = json.dumps(results, ensure_ascii=False).encode("utf-8")` → `urllib.request.Request(...)` → exponential backoff loop (`time.sleep(2**attempt)`) only on `URLError` / 5xx / 429 / 408. Other 4xx is non-retryable.
+3. Logging: `logging.info("POST %s -> %d", url, status)` on success; `logging.error("POST failed: %s after %d attempts", categorical_reason, attempts)` on terminal failure. **Never** log request body, response body, or `err.read()` content (T-PII-01).
+4. Exit code: 0 on 2xx, 1 on terminal failure.
+
+### STREAM-01 — argparse additions
+
+```text
+--emit-format {array,ndjson}    Default: array (D-17, byte-identical to v1.1)
+```
+
+Behavior:
+- Default path stays `json.dump(results, ..., indent=2, ensure_ascii=False)` — D-17 byte-identical (TRAIL-03 golden fixture must remain green).
+- `ndjson` path streams: builds `row_dict`, validates if `--validate`, writes `json.dumps(row, ensure_ascii=False, separators=(",", ":")) + "\n"` to stdout/`-o` per row, **without** accumulating `results` in memory. This is the T-RESOURCE-01 follow-through: removes the >50k-row / >250MB RAM ceiling.
+- AUTO-01 + STREAM-01 interaction: NDJSON + POST is out of scope unless target webhook accepts NDJSON; document in REQUIREMENTS.
+
+### MAKE-TEST-01 — file layout
+
+```
+quizify-csv-to-json-webhook/make-scripts/
+  quizify-mapping.js                  (existing IIFE; minimal change — extract pure transform if needed)
+  score-calculations.js               (existing IIFE; ditto)
+  quizify-mapping.test.js             (NEW — node:test suite)
+  score-calculations.test.js          (NEW — node:test suite)
+  test-harness/
+    load.js                           (NEW — small ~30 LOC shim that exposes a pure transform(input) for each module)
+    fixtures/
+      input-row.example.json          (synthetic, T-PII-01-safe; mirrors a single Python emit row)
+  CONVENTIONS.md                      (existing; extend with "Running tests: `node --test`")
+  package.json                        (NEW, optional — see below)
+```
+
+The harness shim is needed because `quizify-mapping.js` is a Make.com IIFE: it reads `input.quiz_response` at module top-level and ends with `return output`. Two viable approaches:
+1. **Refactor (recommended):** extract a pure `transform(input)` function in each module; production wrapper at the end (`return transform({ quiz_response: input.quiz_response })`) keeps Make.com behavior identical. Tests target the pure function. Adds <10 LOC per module.
+2. **Wrap-and-eval:** read source as text, wrap as `new Function("input", source.replace(/return /, "return "))`. Brittle and harder to debug — only use if MAKE-COSMETIC-01/02 must land without touching surrounding code.
+
+Recommend approach 1; ships alongside MAKE-COSMETIC-01/02 in the same diff.
+
+Optional minimal `package.json`:
+```json
+{ "name": "quizify-make-scripts-tests", "private": true, "type": "module", "scripts": { "test": "node --test" }, "engines": { "node": ">=20" } }
+```
+No `dependencies`, no `devDependencies`. Place inside `make-scripts/` to scope the JS toolchain to that surface and keep the Python project root clean. The repo introduces JavaScript tooling for the first time — keeping it siloed prevents creep.
 
 ## Installation
 
 ```bash
-# If adding as hard dep (not recommended — see below):
-pip install fastjsonschema==2.21.2
+# Python — no change from v1.1
+pip install '.[validate]'   # only if --validate / --post-url used
 
-# If adding as optional extra via pyproject.toml:
-pip install '.[validate]'
-
-# Dev (unchanged):
-pip install -r quizify-csv-to-json-webhook/requirements-dev.txt
+# Node — no install step required; just need Node 20+ on PATH
+node --version              # confirm >= v20
+node --test quizify-csv-to-json-webhook/make-scripts
 ```
-
----
-
-## Packaging Recommendation: Optional Extra, Not Hard Dep
-
-**Use `pip install '.[validate]'` pattern via `pyproject.toml` (or `setup.cfg`).**
-
-Rationale:
-
-- `--validate` is default-off. An operator running the script without `--validate` never needs `fastjsonschema` installed. Making it a hard dep adds an install requirement that 100% of plain-conversion users never benefit from.
-- The project pattern is "stdlib-only at runtime" (D-13). The least disruptive framing is: stdlib remains the runtime baseline; `[validate]` is an opt-in capability tier.
-- If the script is later vendored or copied into an environment with a restricted package index, the `[validate]` extra can simply be omitted without breaking the core conversion path.
-- Concretely: add a `pyproject.toml` with `[project.optional-dependencies] validate = ["fastjsonschema>=2.21.2"]`. This does not require converting the single-file script into a package — `pyproject.toml` can declare extras for scripts in the same directory.
-- In `quizify_csv_ingest.py`, gate the import with a try/except that raises a clear `SystemExit` when `--validate` is passed but `fastjsonschema` is not installed:
-
-```python
-# Near top of file, only imported when needed:
-def _import_validator():
-    try:
-        import fastjsonschema
-        return fastjsonschema
-    except ImportError:
-        raise SystemExit(
-            "ERROR: --validate requires fastjsonschema. "
-            "Install with: pip install 'quizify[validate]'"
-        )
-```
-
-This keeps the import lazy (no startup cost when `--validate` is not passed) and gives the operator an actionable error message.
-
----
 
 ## Alternatives Considered
 
 | Recommended | Alternative | When to Use Alternative |
 |-------------|-------------|-------------------------|
-| `fastjsonschema` 2.21.2 | `jsonschema` 4.17.3 | Only if richer error reporting (error iterators, `best_match`) is needed for human-facing diagnostics — not this use case |
-| `fastjsonschema` 2.21.2 | Hand-rolled validator | Only if the schema will never be published, reused by AUTO-01, or consumed by external tooling |
-| Optional extra `[validate]` | Hard runtime dep | Only if ALL callers are guaranteed to want validation (e.g., if `--validate` becomes default-on in a future version) |
-
----
+| `urllib.request` | `requests` 2.x | If we ever need: connection pooling across many POSTs in one invocation, multipart uploads, or sophisticated auth (OAuth2, AWS SigV4). None apply to AUTO-01 (single one-shot POST) — and adding `requests` would break D-13 |
+| `urllib.request` | `httpx` 0.27+ | If we needed async or HTTP/2. Neither applies; AUTO-01 is sync, single-request |
+| Hand-rolled retry loop | `tenacity` | If retry policy grew to >5 distinct conditions or needed jitter/circuit-breaker. Two-condition (transient vs permanent) is trivially expressible inline |
+| Hand-rolled NDJSON | `ndjson` / `jsonlines` (PyPI) | These libraries are ~50 LOC each and trade nothing for a dependency. `for row in rows: out.write(json.dumps(row) + "\n")` is the entire library |
+| `node:test` | Vitest 2.x | If `make-scripts/` ever grows TypeScript, Vite integration, snapshot testing, or browser-mode needs. Vitest is the right answer for any non-trivial JS codebase — but two ~200-LOC IIFE files don't qualify |
+| `node:test` | Jest 29.x | Jest is the legacy default; for new projects in 2026 Vitest has surpassed it. For library/CLI-shaped surfaces, `node:test` is the recommended pick |
+| `node:test` | Mocha + Chai | Configuration overhead with no upside over the built-in for this scope |
 
 ## What NOT to Use
 
 | Avoid | Why | Use Instead |
 |-------|-----|-------------|
-| `jsonschema` >= 4.18.0 | Requires Python >= 3.8; breaks stated Python 3.7+ compat constraint | `fastjsonschema` 2.21.2 |
-| `jsonschema` 4.26.0 | Requires Python >= 3.10 and adds `rpds-py` (Rust extension); 4 transitive deps | `fastjsonschema` 2.21.2 |
-| `python-jsonschema-objects` | Code-generation tool, not a validator | `fastjsonschema` or `jsonschema` |
-| Any Node test runner for MAKE-FIX-01 / CONTRACT-01 | Deferred by explicit v1.1 decision; adds toolchain complexity disproportionate to two small files | Manual verification against `quizify-submissions.csv` sample |
+| `requests`, `httpx`, `aiohttp` | Breaks D-13 stdlib-only-at-runtime; v1.0/v1.1 ethos is to add deps only when justified, and one-shot POST is not justification | `urllib.request` |
+| `ndjson` / `jsonlines` PyPI packages | Trivially hand-rollable in 3 lines; adds an install-time dep with zero feature value | `json.dumps(row) + "\n"` per line |
+| Logging response body / `err.read()` on HTTPError | T-PII-01 — payload echoes contain PII (email, phone, free-text answers). Status + categorical reason only | Log `err.code` + `err.reason` (categorical) |
+| `verify=False` / disabled TLS | Webhook delivery is the egress point; trusting target cert is mandatory | `ssl.create_default_context()` (default) |
+| Vitest / Jest / Mocha for `make-scripts/` | Two small IIFE files; tooling overhead exceeds value. v1.1 explicitly deferred this gating it on LOC growth | `node:test` + `node:assert/strict` |
+| Babel / TypeScript compile step in `make-scripts/` | Make.com runs raw IIFE JS; introducing a build step creates source/runtime drift risk. CONVENTIONS.md mandates "what runs in Make.com is what's in the file" | Plain JS — no build step |
+| `pytest-httpserver` / `responses` for AUTO-01 tests | Stdlib `http.server.BaseHTTPRequestHandler` in a daemon thread is sufficient for fake-webhook fixtures | Stdlib `http.server` |
 
----
+## Stack Patterns by Variant
+
+**If `--post-url` is set (AUTO-01):**
+- `--validate` is implicitly required (AUTO-01 gates on VALI-01 success per PROJECT.md). Either auto-enable or hard-fail with a clear error if `--post-url` is set without `--validate`.
+- Recommend: hard-fail. Rationale: explicit > implicit, and silently flipping a flag complicates the audit trail.
+
+**If `--emit-format=ndjson` (STREAM-01):**
+- `--validate` becomes per-row instead of whole-array. Lazy-compile validator once, call per row. This is a behavior change worth documenting in README + a new decision row.
+- Output path differs: `json.dumps(row, separators=(",",":"))` — compact, never indented.
+- Cannot be combined with `--post-url` in v1.2 (defer to v1.3 if/when target webhook supports NDJSON streaming).
+
+**If `make-scripts/` LOC grows past ~500 or adds a third module:**
+- Revisit `node:test` vs Vitest. The trigger is when `node:test`'s lack of snapshot/UI starts costing time, not when LOC crosses a magic number.
 
 ## Version Compatibility
 
-| Package | Python constraint | Notes |
-|---------|-------------------|-------|
-| `fastjsonschema` 2.21.2 | None declared (`requires_python` absent) | Tested from 3.3+; docs confirm 3.3+; safe for 3.7+ |
-| `jsonschema` 4.17.3 | `>=3.7` | Last 3.7-compatible release; frozen at this version means no upstream security patches |
-| `jsonschema` 4.18.0+ | `>=3.8` | Dropped 3.7 in this release |
-| `jsonschema` 4.26.0 | `>=3.10` | Current latest; incompatible with project constraint |
+| Package A | Compatible With | Notes |
+|-----------|-----------------|-------|
+| Python 3.7+ | `urllib.request` | All needed APIs (`Request`, `urlopen`, `HTTPError`, `URLError`, `timeout=`) stable since 3.6 |
+| Python 3.7+ | `fastjsonschema>=2.21.2` | Already verified in v1.1 |
+| Node 20.x LTS | `node:test` stable | First stable release; sufficient for v1.2 needs |
+| Node 22.x LTS | `node:test` + `--experimental-test-coverage` | Coverage promoted to stable; mock-timer ergonomics improved. Recommended floor for new contributor docs |
 
----
+## Open Questions for PLAN Phase
 
-## Schema Design Note (VALI-01 integration point)
-
-The schema file should live at `quizify-csv-to-json-webhook/schema/quizify-webhook.schema.json` (Draft-07). Validation hooks into `convert()` in `quizify_csv_ingest.py` after `build_row()` returns and before `results.append(row_dict)`. The compiled validator object is created once before the row loop when `args.validate` is True, and called per-row. Schema violations exit non-zero (consistent with existing `exit_code |= 1` pattern for row-length mismatches).
-
-Key schema constraints to encode:
-- Required top-level keys: contact block (`email`, `firstName`, `lastName`, `status`, `statusDate`, `phone`), `tags` (array), `quiz_title` (string), at least one `question-1`/`answers-1`/`answers-tags-1` triple, scoring trio (`result-logic`, `score-category`, `score-value`), four reserved placeholders (`product-recommendation`, `product-link-type`, `title`, `type-page-url`).
-- `patternProperties` for the `question-N`/`answers-N`/`answers-tags-N` triples using `^question-\d+$` etc.
-- Do NOT validate question text values or answer content — only structural envelope.
-
----
+1. **AUTO-01 retry policy:** which HTTP statuses are retried? Recommend: 408, 429, 500, 502, 503, 504 + all `URLError`. Other 4xx is permanent.
+2. **AUTO-01 + `--validate` coupling:** auto-enable or hard-fail? Recommend hard-fail.
+3. **STREAM-01 flag name:** `--ndjson` vs `--emit-format=ndjson`. The latter scales to future formats. Recommend `--emit-format`.
+4. **MAKE-TEST-01 IIFE refactor:** export a pure `transform()` function or wrap-and-eval the existing IIFE? Recommend refactor.
 
 ## Sources
 
-- `/python-jsonschema/jsonschema` (Context7) — version history, Python compat, transitive deps (HIGH confidence)
-- `/websites/horejsek_github_io_python-fastjsonschema` (Context7) — version, Python compat, draft support (HIGH confidence)
-- PyPI API `https://pypi.org/pypi/jsonschema/4.17.3/json` — `requires_python` and `requires_dist` verified directly (HIGH confidence)
-- PyPI API `https://pypi.org/pypi/fastjsonschema/2.21.2/json` — `requires_python` (absent) and `requires_dist` (devel-only extras) verified directly (HIGH confidence)
-- `pip index versions jsonschema` / `pip index versions fastjsonschema` — current latest versions confirmed locally (HIGH confidence)
+- [Node.js v22.21.1 Test runner documentation](https://nodejs.org/docs/latest-v22.x/api/test.html) — verified `node:test` stable, watch mode, coverage status (HIGH)
+- [Node.js v25.9.0 Test runner documentation](https://nodejs.org/api/test.html) — current API surface (HIGH)
+- [Vitest — Comparisons with Other Test Runners](https://vitest.dev/guide/comparisons.html) — Vitest team's own positioning vs `node:test` (HIGH)
+- [vitest-dev/vitest Discussion #4631 — Comparison with native node test runner](https://github.com/vitest-dev/vitest/discussions/4631) — community consensus on small-library use case (MEDIUM)
+- [PkgPulse — node:test vs Vitest vs Jest (2026)](https://www.pkgpulse.com/blog/node-test-vs-vitest-vs-jest-native-test-runner-2026) — 2026 adoption trends (MEDIUM)
+- [Python urllib.request — official docs](https://docs.python.org/3/library/urllib.request.html) — `Request`, `urlopen`, `timeout` parameter (HIGH)
+- Existing repo: `.planning/PROJECT.md` (D-13, T-PII-01, VALI-01 lineage), `.planning/MILESTONES.md` (v1.2 deferred-bucket scope), `quizify_csv_ingest.py` (CLI integration surface) — direct read (HIGH)
 
 ---
-*Stack research for: Quizify CSV → Webhook JSON CLI, v1.1 Contract Hardening additions*
-*Researched: 2026-05-03*
+*Stack research for: v1.2 Delivery & Make.com Hygiene (AUTO-01, STREAM-01, MAKE-TEST-01)*
+*Researched: 2026-05-05*

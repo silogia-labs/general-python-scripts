@@ -1,358 +1,352 @@
-# Pitfalls Research
+# Pitfalls Research — v1.2 Delivery & Make.com Hygiene
 
-**Domain:** Python stdlib CLI + co-owned Make.com JS consumer — v1.1 contract hardening addition
-**Researched:** 2026-05-03
-**Confidence:** HIGH — all findings grounded in direct code inspection of `quizify_csv_ingest.py`, `quizify-mapping.js`, `score-calculations.js`, and the full v1.0 test suite
+**Domain:** stdlib-Python CLI adding HTTP egress + NDJSON streaming + Node test harness for co-owned IIFE JS
+**Researched:** 2026-05-05
+**Confidence:** HIGH (urllib + NDJSON pitfalls are well-documented stdlib behaviors; Node-harness pitfalls verified against the IIFE module shape in `make-scripts/`); MEDIUM where Make.com sandbox specifics are inferred.
+
+This file enumerates pitfalls **specific to ADDING** AUTO-01, STREAM-01, MAKE-TEST-01 (with MAKE-COSMETIC-01/02) to a codebase that already enforces D-13 stdlib-only-at-runtime, T-PII-01 PII-safe stderr, D-05 locked top-level key order, D-11 README ten-section lock, and the VALI-01 `--validate` gate. Generic "use HTTPS" advice is omitted.
 
 ---
 
 ## Critical Pitfalls
 
-### Pitfall 1: `additionalProperties: false` breaks dynamic-column tolerance (VALI-01)
+### Pitfall 1: `urllib.request.urlopen()` defaults to NO timeout
 
 **What goes wrong:**
-The schema rejects any row that has more than the locked set of keys, which means adding a 21st Quizify question column causes every run in `--validate` mode to exit non-zero — silently, from the user's perspective — until they figure out why.
+A misbehaving Make.com webhook (TCP-accept-but-never-respond, slow-loris, proxy hang) blocks the CLI forever. Operators see no output, no error, no exit; CI pipelines wedge until the runner kills them.
 
 **Why it happens:**
-JSON Schema `additionalProperties: false` is the standard way to enforce a closed contract, but `quizify_csv_ingest.py` intentionally emits `question-N` / `answers-N` / `answers-tags-N` triples for *all* dynamic columns discovered at runtime. There is no fixed N; the quiz may have 20 today and 22 after the operator adds a new question. The schema cannot enumerate all valid key names statically.
+`urlopen()` uses `socket._GLOBAL_DEFAULT_TIMEOUT`, which is `None` (= block forever) unless explicitly overridden. Tutorials and stackoverflow snippets almost universally omit `timeout=`. Developers expect `requests`-like reasonable defaults; stdlib has none.
 
 **How to avoid:**
-Use `patternProperties` for the dynamic triples and `additionalProperties: false` only for the fixed keys outside that pattern. Specifically, the JSON Schema for `question-N`, `answers-N`, and `answers-tags-N` must use `"patternProperties": { "^(question|answers|answers-tags)-[0-9]+$": {} }` alongside the fixed key definitions, with `additionalProperties: false` scoped only to the contact/scoring tail. Alternatively, omit `additionalProperties: false` entirely and only use `required` to gate presence of mandatory fixed keys — this is the safer default for a growing contract.
+- Pass an explicit `timeout=` (seconds, float) on every `urlopen()` call. Recommend a documented default (e.g. 10s) configurable via `--http-timeout` flag.
+- Add a unit test that monkeypatches `urlopen` and asserts the `timeout` kwarg was passed (and is finite).
+- CI grep gate: `urlopen(` without `timeout=` on the same logical call fails the build.
 
 **Warning signs:**
-- `--validate` mode exits non-zero on a real export that works fine without it
-- Schema test suite only covers the current 20-question fixture; no test verifies behaviour when K differs
+- Integration test against a deliberately-stalled local server hangs past N seconds.
+- Operators report "the script just sits there" with no stderr output.
 
-**Phase to address:**
-VALI-01 (validation phase) — must be enforced as an acceptance criterion before schema is considered shippable.
+**Phase to address:** AUTO-01 implementation phase. Set the timeout default + flag in the same plan that introduces `--post`.
 
 ---
 
-### Pitfall 2: `required` array covers only a subset of D-05 locked tail keys (VALI-01)
+### Pitfall 2: HTTP error response bodies leaked into stderr (T-PII-01 violation)
 
 **What goes wrong:**
-The schema `required` array lists, say, `email` and `result-logic` but omits `product-recommendation`. A row that silently drops that key passes validation. The D-05 lock in `test_key_order_locked` catches order but not absence at the schema level; these are separate guarantees.
+The naive error path logs `e.read().decode()` from `urllib.error.HTTPError`. Make.com's webhook on validation/parse errors echoes back snippets of the submitted payload (or at least the offending field) — meaning email addresses, phone numbers, and free-text answers land in stderr, breaking T-PII-01's negative-substring contract.
 
 **Why it happens:**
-Developers copy-paste a subset of keys from the example payload when writing the schema and miss the four reserved-placeholder keys (`product-recommendation`, `product-link-type`, `title`, `type-page-url`) because those ship as `null` / `""` and feel like optional metadata.
+- `HTTPError` instances are file-like — `print(e)` plus reading `e` "to debug" is the canonical urllib snippet.
+- Webhook services routinely include request-context in 4xx bodies ("invalid field 'email' value 'alice@…'").
+- T-PII-01 was written before any HTTP surface existed; nobody has added "HTTP response body" to the negative-substring assertion list.
 
 **How to avoid:**
-The `required` array in the schema MUST include all eight fixed-tail keys: `result-logic`, `score-category`, `score-value`, `product-recommendation`, `product-link-type`, `title`, `type-page-url`, plus the contact block (`email`, `firstName`, `lastName`, `status`, `statusDate`, `phone`, `tags`, `quiz_title`). Cross-reference against `PHASE_3_REQUIRED_KEYS` in `test_structural_invariants.py` — that frozenset is the canonical list and the schema must require at least the same keys. Add a test that intentionally drops each required key one at a time and asserts the schema raises a `ValidationError`.
+- **Categorical-only logging.** Log: HTTP status code, status reason phrase, response Content-Type, response body byte length, and a fixed error-class label (`http_4xx_client`, `http_5xx_server`, `network_timeout`, `dns_failure`, `tls_failure`). Never log body bytes, never log request URL query string, never log request headers (may contain auth).
+- **Locked PII-safe error template** — extend the existing D-06-19/D-06-20 lock pattern: e.g. `"http POST failed: status=%d reason=%s class=%s body_bytes=%d"`. Treat as immutable once shipped.
+- **Negative-substring tests** mirroring the existing T-PII-01 pattern: feed a fake `HTTPError` whose body contains email/phone/free-text fixtures from `quizify-submissions.csv`, capture stderr, assert none of those substrings appear. Add a `TestHTTPErrorPIIsafe` class parallel to `TestValidationFailurePIIsafe`.
+- **Verbose mode does NOT bypass this.** `-v`/`--verbose` may add request count, retry attempt, elapsed ms — never body bytes. Document explicitly in README.
 
 **Warning signs:**
-- Schema `required` list is shorter than `PHASE_3_REQUIRED_KEYS | contact_keys`
-- No parametric test that removes keys and expects failure
+- A new log line that interpolates `e.read()`, `e.fp`, `response.read()`, or `response.text` anywhere in the POST path.
+- A test that captures stderr and asserts a *positive* substring from a real response — that test is encoding a leak.
 
-**Phase to address:**
-VALI-01 — schema authoring step, before implementation code is written (TDD: schema test first).
+**Phase to address:** AUTO-01 — PII-safe error formatter must land in the same plan as the request issuer, not deferred.
 
 ---
 
-### Pitfall 3: First runtime dependency breaks stdlib-only guarantee (VALI-01 + D-13)
+### Pitfall 3: VALI-01 ↔ AUTO-01 race — POST issued before/instead of validation
 
 **What goes wrong:**
-Adding `import jsonschema` at the top of `quizify_csv_ingest.py` causes an `ImportError` on any machine that has not run `pip install jsonschema`, including all CI environments that test the v1.0 "no install required" contract. The `test_structural_invariants.py` module-scoped fixture invokes the CLI via `subprocess.run([sys.executable, str(SCRIPT), ...])`, so it will immediately fail on a clean virtualenv.
+Two failure modes:
+(a) `--post` works without `--validate`, allowing schema-invalid payloads to hit the webhook (defeats the AUTO-01 gating premise from the milestone goal).
+(b) Validation and POST are wired in the wrong order — POST starts before `_run_schema_validation` returns, or validation runs but its non-zero exit doesn't short-circuit the POST.
 
 **Why it happens:**
-It is the obvious import style. The constraint "stdlib-only at runtime" exists in `PROJECT.md` constraints but is easy to overlook when writing a new feature file.
+- `--validate` was originally an *exit-code* gate (return 1, end of program). Re-using it as a *control-flow* gate inside the same invocation is a different shape.
+- argparse mutual-requirement enforcement is easy to forget; argparse has no native "requires" relation.
+- When refactoring main flow to `validate → emit → post`, a developer may keep the old `sys.exit(1)` inside the validator and skip moving the POST call below it — fragile integration.
 
 **How to avoid:**
-Use a lazy/conditional import: move `import jsonschema` inside the function that performs validation, guarded by a `try/except ImportError` that raises a clear `SystemExit("--validate requires 'jsonschema': pip install jsonschema")`. This preserves v1.0 behaviour for non-`--validate` calls. Add a test that runs the CLI without `--validate` in a subprocess with `jsonschema` absent (monkeypatch `sys.modules`) and asserts exit code 0.
+- argparse post-parse check: `if args.post and not args.validate: parser.error("--post requires --validate")`. Add a CLI test asserting this exact error.
+- Single linear control-flow function: `payload = build(...); validate_or_exit(payload, args); if args.post: post_or_exit(payload, args)`. No callbacks, no threads.
+- Integration test: invoke the CLI with `--post` against a deliberately malformed CSV that fails schema; assert (1) exit code non-zero, (2) the mock HTTP server received zero requests. The "zero requests" assertion is the load-bearing one.
+- Symmetric test: `--post` against the 42-row sample with a mock server; assert exactly one request was issued.
 
 **Warning signs:**
-- `import jsonschema` appears at module top-level
-- No test covering the "jsonschema not installed" path
+- Test for "POST succeeds" exists but no test for "POST is suppressed on schema failure."
+- `--post` accepted standalone in `--help` without mentioning `--validate`.
 
-**Phase to address:**
-VALI-01 — must be a design constraint stated in the plan before implementation begins.
+**Phase to address:** AUTO-01. The mock-HTTP-server harness must land in the same plan; "zero requests on invalid payload" is a phase-exit criterion.
 
 ---
 
-### Pitfall 4: PII leakage through `jsonschema` ValidationError messages (T-PII-01 / VALI-01)
+### Pitfall 4: SSL verification accidentally disabled or weakened
 
 **What goes wrong:**
-`jsonschema.ValidationError` instances carry a `.instance` attribute containing the failing value. If that value is an email address or phone number (e.g. the `email` field fails pattern validation), and the code logs `str(error)` or `error.message` to stderr, real PII exits to the terminal and potentially to log aggregation.
+A developer hits a corporate-proxy or self-signed-cert issue while testing against a staging webhook, googles the error, and pastes `ssl._create_unverified_context()` or `context.check_hostname = False; context.verify_mode = ssl.CERT_NONE` into the POST helper. It ships that way. Production traffic (PII!) is now MITM-vulnerable.
 
 **Why it happens:**
-The natural idiom is `logging.error("Schema validation failed: %s", error)`. `jsonschema`'s default `str(error)` representation includes the instance value in its output.
+- urllib's TLS error messages are cryptic ("CERTIFICATE_VERIFY_FAILED"); the fastest path past them is to disable verification.
+- No big red flag in stdlib for "you just turned off the security you were trying to add."
+- Easy to assume "Make.com handles the TLS, we're fine" and not realize the *client side* is the one being downgraded.
 
 **How to avoid:**
-Log only `error.json_path` (the failing key path) and `error.validator` / `error.validator_value` (what rule failed), never `error.instance` or the full `str(error)`. Add a PII-safety test modelled on the existing `test_logging_pii.py` pattern: construct a payload where the failing field is an email cell, run `--validate`, and assert the email string is absent from stderr.
+- Use `ssl.create_default_context()` (or just let `urlopen` default) — never `_create_unverified_context`.
+- Reject `http://` URLs at argparse-parse time with a hard error: `--post-url` must start with `https://`. Add a CLI test.
+- CI grep gate: presence of `CERT_NONE`, `_create_unverified_context`, `check_hostname = False`, or `verify=False` anywhere in the file fails the build.
 
 **Warning signs:**
-- `logging.error(..., error)` or `logging.error(..., str(error))` without stripping `.instance`
-- No validation-specific entry in `test_logging_pii.py`
+- Commit message or PR description containing "fix SSL", "ignore cert", "self-signed".
+- A new `import ssl` line whose only purpose is constructing a context.
 
-**Phase to address:**
-VALI-01 — must be part of the error-reporting implementation step; reference T-PII-01 explicitly in the plan.
+**Phase to address:** AUTO-01.
 
 ---
 
-### Pitfall 5: `answers-N` empty-array vs missing-key schema ambiguity (VALI-01 + quizify-mapping.js)
+### Pitfall 5: urllib follows redirects silently — including HTTPS→HTTP downgrades and cross-host
 
 **What goes wrong:**
-`quizify-mapping.js` `extractAnswer()` handles both `Array.isArray(answers)` and `typeof answers === "string"` cases — the code tolerates empty arrays, empty strings, and single-item arrays. If the schema only accepts non-empty arrays for `answers-N`, it rejects the empty-string case (`shape_answer("")` returns `""`). If it only accepts strings, it rejects the object-array case. Either direction causes spurious validation failures.
+A misconfigured webhook returns 301/302 to a different host (or worse, to an `http://` URL). `urllib.request.HTTPRedirectHandler` follows it transparently, the operator sees a "200 OK" from a URL they didn't ask to talk to, and PII has been delivered to the wrong endpoint.
 
 **Why it happens:**
-The answer shape heuristic in `shape_answer()` produces three distinct types: `""`, `"multi, select, string"`, or `[{...}]`. A naive schema writer sees the example payload, observes only object arrays, and writes `"type": "array"` — forgetting the string branch.
+Default `OpenerDirector` includes `HTTPRedirectHandler`. There's no audit log of the redirect chain; `response.geturl()` returns the final URL but nobody calls it.
 
 **How to avoid:**
-The schema for `answers-N` must use `anyOf`: `[{"type": "string"}, {"type": "array", "items": {…}}]`. Test against all three branches from `test_answers_key_is_str_or_object_list` (which already validates these shapes at the Python level). The schema tests should import the same test CSV and verify all three shapes pass schema validation.
+- Build a custom opener with a redirect handler that refuses all redirects (raises) — Make.com webhooks should not redirect in normal operation; refusing is safer than allowing same-host hops.
+- Always assert `response.geturl() == request_url` after the call; log a categorical `http_unexpected_redirect` (never the redirect target — could itself contain PII tokens) and exit non-zero if mismatched.
+- Test with a local mock server that returns 302 to a different host; assert the CLI refuses and exits non-zero.
 
 **Warning signs:**
-- Schema `answers-N` definition uses `"type": "array"` without a `anyOf` string branch
-- Schema test suite only covers the golden-file example (which happens to use arrays for all non-multi-select answers)
+- `response.status == 200` against a webhook that operators think is dead.
+- Latency higher than expected for a simple POST (extra round-trip).
 
-**Phase to address:**
-VALI-01 — schema definition step.
+**Phase to address:** AUTO-01.
 
 ---
 
-### Pitfall 6: JSON Schema draft mismatch causes silent rule differences (VALI-01)
+### Pitfall 6: NDJSON trailing-newline ambiguity breaks downstream parsers
 
 **What goes wrong:**
-`jsonschema` 4.x defaults to Draft 2020-12. Draft 2019-09 and earlier treat `$schema`, `items` (for tuple validation), and `unevaluatedProperties` differently. If the schema is written against Draft 7 semantics (common copy-paste source) but executed under Draft 2020-12, tuple `items` definitions silently do nothing — validating arrays that should be rejected.
+Some emitters write `record\n` per line (correct); some emit `\n`-separated (last record has no trailing newline, breaks `wc -l`-style consumers); some write CRLF on Windows; some emit a final blank line that downstream `json.loads` chokes on.
 
 **Why it happens:**
-Online JSON Schema examples and the `jsonschema` quickstart often omit `$schema` declarations, so the draft version is implicit and easy to misread.
+- `print()` adds `\n` but flushes lazily; `file.write(json.dumps(obj))` forgets the newline; `json.dump(obj, file); file.write("\n")` is the only correct stdlib pattern and is non-obvious.
+- `json.dumps` defaults can emit non-ASCII as `\uXXXX` escapes — fine for NDJSON validity but surprising in diffs against the v1.0 golden fixture.
+- `open(path, "w")` on Windows turns `\n` into `\r\n` (universal newline translation); NDJSON consumers that split on `\n` see trailing `\r`.
 
 **How to avoid:**
-Declare `"$schema": "https://json-schema.org/draft/2020-12/schema"` explicitly in the schema file and pin `jsonschema>=4.18` in `requirements-dev.txt`. If Draft 7 semantics are needed for any reason, call `jsonschema.Draft7Validator` explicitly rather than `jsonschema.validate()`. Add a test that checks the schema file contains the expected `$schema` URI.
+- Lock the emit pattern: `out.write(json.dumps(record, ensure_ascii=False, separators=(",", ":")) + "\n")`. Document in code comment + README.
+- Open files with `open(path, "w", encoding="utf-8", newline="\n")` to disable newline translation.
+- Test asserts: file ends with exactly one `\n`; no `\r` byte appears anywhere; `len(file.read().split(b"\n")) == row_count + 1`.
+- Round-trip test: read NDJSON back via `for line in f: json.loads(line)`; record count and structural equality with the JSON-array emit path.
 
 **Warning signs:**
-- Schema file has no `$schema` declaration
-- `jsonschema.validate()` called without a `cls=` argument
+- Downstream consumer reports "extra blank record" or "last record truncated."
+- File size differs by exactly N bytes from expected (CRLF translation indicator).
 
-**Phase to address:**
-VALI-01 — plan authoring step; state the draft version as a first-class decision.
+**Phase to address:** STREAM-01.
 
 ---
 
-### Pitfall 7: Schema validates serialized JSON differently than Make.com deserializes it (VALI-01)
+### Pitfall 7: Streaming output is not atomic — partial files on crash get consumed as "complete"
 
 **What goes wrong:**
-Python's `json.dump(..., ensure_ascii=False)` emits literal Unicode (e.g. `"¿Fuiste asignada..."`) while an older `ensure_ascii=True` call (e.g. in tests, or if the flag is inadvertently toggled) emits `¿`. The schema validates the Python-serialized form, not the wire form. If Make.com deserialises the escaped form differently (it shouldn't, but), or if tests compare the escaped string to the unescaped schema, assertions fail for non-obvious reasons.
+The CLI streams 50k rows to `output.ndjson`. On row 37,412 a CSV decode error or a SIGINT aborts the run. The file on disk has 37,412 well-formed NDJSON lines; downstream automation sees the file, processes it, and silently drops 12.5k respondents.
 
 **Why it happens:**
-`ensure_ascii` defaults to `True` in `json.dumps()` but the CLI explicitly passes `ensure_ascii=False`. A future test helper that calls `json.dumps()` without that flag produces a different byte stream, which could trigger a schema assertion that passes in production but fails in test, or vice versa.
+- Streaming's whole point is "don't buffer the whole thing in RAM," which means the file is observable mid-write.
+- Default `open(path, "w")` truncates immediately, then writes incrementally — there's no "complete" signal.
+- Unlike the v1.0/v1.1 emit-once-at-end path, no natural moment where "file written" == "all rows succeeded."
 
 **How to avoid:**
-All test helpers that construct JSON for schema-validation tests must use the same `json.dumps(obj, indent=2, ensure_ascii=False)` call as the production `convert()` function. Extract a `_serialize(results)` helper in the module that tests can import, so the serialization path is single-source.
+- Write to `output.ndjson.tmp` (or `.partial`); on success, `os.replace(tmp, final)` (atomic on POSIX and Windows). On any exception, leave the `.tmp` in place and exit non-zero.
+- Document the temp-file extension in README so operators / watchers can ignore it.
+- Test: SIGINT mid-stream, assert final path does not exist and `.tmp` does.
 
 **Warning signs:**
-- Test helpers using bare `json.dumps(obj)` or `json.dumps(obj, ensure_ascii=True)`
-- Schema test failures involving non-ASCII question texts (Spanish characters)
+- Downstream pipelines occasionally process truncated record counts; correlation with CSV errors or operator Ctrl-C.
 
-**Phase to address:**
-VALI-01 — serialization helper extraction step.
+**Phase to address:** STREAM-01 — atomic-rename pattern in the same plan as the streaming writer.
 
 ---
 
-### Pitfall 8: `--dry-run` skips validation; schema drift goes undetected until real run (VALI-01)
+### Pitfall 8: Per-row validation vs whole-stream validation semantic split
 
 **What goes wrong:**
-`--dry-run` is the operator's preview path. If `--validate` only activates in `convert()` (not `dry_run()`), then operators who always preview before running never hit the schema check. Schema violations accumulate silently and only surface when the operator removes `--dry-run`.
+VALI-01 was designed to validate the *whole array* shape (`type: "array"`, `items: {...}`). When streaming, the array boundary disappears — there's no "the document" anymore, just a sequence of items. Two failure modes:
+(a) Validator run on each row using the array schema → every row fails with `"is not of type 'array'"`.
+(b) Validator run only on the first/last row, or not at all in stream mode → the AUTO-01 gate is bypassed for large inputs.
 
 **Why it happens:**
-`dry_run()` does not build row dicts; it just classifies headers. Schema validation requires a fully-built row. Naively, validation is placed only in `convert()`.
+The v1.1 schema is rooted at `array`. Switching emit modes silently switches the schema target; the path through `_run_schema_validation` doesn't know which mode is active.
 
 **How to avoid:**
-Document explicitly in the README and plan that `--dry-run` does NOT validate payload shape (it cannot — no rows are built). The canonical preview-with-schema path is `--validate` without `--dry-run`, using a sample CSV. The `--dry-run --validate` combination should either be explicitly prohibited with a clear error, or silently ignored with a WARNING log entry. Either choice must be tested. Do not silently drop the `--validate` flag when `--dry-run` is set.
+- Refactor: extract the per-item subschema (`schema["items"]`) and validate **per row** in stream mode. Whole-array validation continues for non-stream mode (byte-identical to v1.1).
+- Compiled validator built once per invocation (preserve VALI-01's perf shape — fastjsonschema compile is the expensive part).
+- Test: stream-mode + `--validate` against a malformed row in position 50 of a 100-row CSV; assert exit non-zero, JSON Pointer references the row index, atomic-rename did not happen, no POST issued (if `--post` set).
+- Re-run byte-identity regression: stream the 42-row sample, then `jq -s . output.ndjson` should equal the v1.1 golden fixture.
 
 **Warning signs:**
-- No test covering `--dry-run --validate` interaction
-- README does not describe which flag combinations are valid
+- `--validate` in stream mode either always passes or always fails — neither result sensitive to input.
+- Per-row-validation tests don't include a "good rows before, bad row in middle, good rows after" fixture.
 
-**Phase to address:**
-VALI-01 — CLI argument interaction design, documented before implementation.
+**Phase to address:** STREAM-01, with explicit cross-reference to VALI-01 plan from v1.1.
 
 ---
 
-### Pitfall 9: Substring match collision for trailer scoring lookup (TRAIL-01)
+### Pitfall 9: `make-scripts/` IIFE shape is not directly importable — tests end up testing a copy-paste
 
 **What goes wrong:**
-The v1.0 positional lookup (`trailer_cells_decoded[0..2]`) is being replaced with name-based lookup. The name-based lookup searches the trailer header list for substrings like `"score"`. If a future dynamic question column header contains "score" (e.g. "Escala de dolor (score percibido)") and somehow leaks into the trailer list, or if the substring check is too broad, the wrong cell is mapped to `score-value`.
+`quizify-mapping.js` and `score-calculations.js` are Make.com IIFE / sandbox modules — they read from a global `record` (or `bundle`/`output`) and write to another global, with no `module.exports`. A naive Node test harness either (a) copy-pastes function bodies into `*.test.js` (tests drift from reality) or (b) `eval()`s the file (sandbox semantics differ from Node's).
 
 **Why it happens:**
-The current `DEFAULT_TRAILER` tuple is `("Result logic", "Score category", "Score value", "Answer tags", "Time to complete (mm:ss)", "Date")`. A substring match for `"score"` hits both "Score category" (index 1) and "Score value" (index 2). If the match iterates in order, the first hit wins — miscategorising both. The match must be for the *full canonical name* (NFC+casefold), not a substring.
+Make.com's runtime injects globals into the IIFE scope; there is no public surface to require. The two files were never written with testability in mind (correctly so for v1.0/v1.1).
 
 **How to avoid:**
-Name-based lookup for TRAIL-01 must use exact NFC+casefold equality (`normalize_key(header) == normalize_key(canonical_name)`), not substring containment. The three scoring trailer keys to locate are `"Result logic"`, `"Score category"`, and `"Score value"` — match these exactly, not by partial string. The lookup should build a position map `{canonical_name: index}` once per CSV and assert all three are found or raise a `LayoutError`.
+- **Refactor JS into two-layer shape:** a pure function (`mapRecord(record) → output`) at top of file, then a thin Make.com adapter at the bottom (`output = mapRecord(record);` inside the IIFE) — adapter is 1–3 lines, pure function is the rest. The adapter is what Make.com runs; the pure function is what the harness imports.
+- Use Node's built-in `node:test` + `node:assert` (Node ≥ 18 LTS) to keep the toolchain minimal — no jest, no mocha, no babel. Matches the spirit of D-13's stdlib-only ethos.
+- Export via a conditional `if (typeof module !== "undefined") module.exports = { mapRecord };` at the very bottom, **after** the Make.com adapter, guarded so Make.com's sandbox does not see it. Verify in a sandbox-equivalent test: `delete global.module; require(...)` does not throw.
+- Test fixtures must be **synthetic only** (T-PII-01 — `make-scripts/CONVENTIONS.md` already documents this pattern); no PII from `quizify-submissions.csv` in `make-scripts/__tests__/`.
 
 **Warning signs:**
-- Lookup code uses `.contains()` or `in` operator against trailer header strings
-- No unit test covering a trailer list that contains "score" in two different headers
+- Test file contains a literal copy of a function from the source.
+- Tests pass but a manual run-in-Make.com sanity check fails.
+- The pure function references `record` as a free variable instead of a parameter.
 
-**Phase to address:**
-TRAIL-01 — implementation and unit test authoring.
+**Phase to address:** MAKE-TEST-01 (lands with MAKE-COSMETIC-01/02). Refactor-to-extract-pure-function is the first plan in that phase; cosmetic fixes ride along inside the now-testable pure function.
 
 ---
 
-### Pitfall 10: Silent fallback to positional behaviour preserves the v1.0 mis-bind bug (TRAIL-01)
+### Pitfall 10: Node test harness pollutes Make.com runtime via accidental global writes
 
 **What goes wrong:**
-The temptation is: "if name lookup fails, fall back to `trailer_cells_decoded[0..2]`." This is the exact bug TRAIL-01 is meant to fix. A fallback silently re-introduces positional mis-binding for any `--trailer-columns` invocation where the names don't match.
+The pure-function refactor accidentally introduces an implicit global — forgets `let`/`const` on a loop variable, or assigns to `output` at module top-level for "convenience." In Node it works (sloppy mode); in Make.com it silently overwrites the runtime's reserved names and breaks the scenario.
 
 **Why it happens:**
-Defensive programming instinct. The developer doesn't want the CLI to crash if the CSV has an unexpected trailer, so they add a fallback. The fallback is indistinguishable from the broken v1.0 behaviour.
+Make.com's IIFE wrapper hides scoping issues — the `output` name is *expected* to be assigned. Node-side tests pass because they construct a fresh module each time.
 
 **How to avoid:**
-In `--validate` mode: name lookup failure is a hard `LayoutError`. Without `--validate`: emit a WARNING to stderr that names the missing canonical header and populate the field with `""` (same as a missing optional cell), not by falling back to positional index. Document this change explicitly in the MILESTONES.md entry as a user-facing behaviour change (bugfix). Add a test: pass a custom `--trailer-columns` list with scrambled order, assert the scored fields map to the correct values regardless of position.
+- Top of every JS file: `"use strict";` — turns implicit-global writes into TypeErrors. Both Node and Make.com sandboxes respect strict mode.
+- Lint gate: a tiny `eslint:recommended` config (or hand-rolled grep) flagging `var` usage and undeclared identifiers.
+- Test asserts that calling `mapRecord(fixture)` does not mutate `globalThis`: snapshot `Object.keys(globalThis).sort()` before and after; assert equality.
+- Document expected globals in `make-scripts/CONVENTIONS.md` (extend the existing v1.1 file).
 
 **Warning signs:**
-- Lookup code has an `except`/`or` branch that falls back to an integer index
-- MILESTONES.md does not note the behaviour change for `--trailer-columns` users
+- A function that "works in tests" produces empty/wrong output in Make.com.
+- `globalThis` snapshot test fails after a refactor.
 
-**Phase to address:**
-TRAIL-01 — plan authoring; flag as backwards-compat note from the start.
+**Phase to address:** MAKE-TEST-01.
 
 ---
 
-### Pitfall 11: Case/diacritic normalization mismatch between `TAG_HEADER_MAP` and trailer lookup (TRAIL-01)
+### Pitfall 11: `package.json` accidentally commits runtime dependencies, violating the spirit of D-13
 
 **What goes wrong:**
-`TAG_HEADER_MAP` keyword matching uses `_norm_for_match()` = `unicodedata.normalize("NFC", s).casefold()`. If the new name-based trailer lookup uses a different normalization (e.g. `.lower()` instead of `.casefold()`, or NFC vs NFD), headers with accented characters (Spanish) silently fail to match.
+A contributor adds `lodash`, `chalk`, or — most plausibly — `ajv` ("we're testing JSON, surely we need a JSON validator") to `package.json` `dependencies`. The Make.com runtime can't load npm packages, so it crashes when transitive `require()`s fire; or the Python side gains a soft expectation that node_modules is on disk.
 
 **Why it happens:**
-It is easy to write `header.lower() == canonical.lower()` when the existing `normalize_key()` and `_norm_for_match()` functions are slightly different and the developer uses the wrong one for the trailer lookup.
+- `npm install some-pkg` defaults to writing to `dependencies`, not `devDependencies`.
+- Test-tooling drift — someone adds a "small helper" without thinking about Make.com's zero-deps constraint.
+- `package-lock.json` gets committed alongside, locking in a 200-package transitive tree from one helper.
 
 **How to avoid:**
-TRAIL-01 implementation MUST reuse `_norm_for_match()` (NFC + casefold) for all name comparisons — not `normalize_key()` (which only does NFC without casefold) and not bare `.lower()`. Add a unit test where the trailer header contains a capital letter or an accented character variant (e.g. `"Score Category"` vs `"score category"`) and assert the lookup succeeds.
+- Lock `make-scripts/package.json` to: empty `dependencies`, empty `devDependencies` (use built-in `node:test`), `scripts.test = "node --test make-scripts/__tests__"`, `engines.node = ">=18"`. Ship this exact shape in MAKE-TEST-01.
+- CI gate: a test asserting `JSON.parse(package.json).dependencies` is `{}` and `devDependencies` is `{}`. JS-side analog of `pyproject.toml`'s empty `[project.dependencies]`.
+- README addition (within D-11 ten-section lock — likely under "Development"): "make-scripts/ runs zero-dependency Node tests; do not add npm packages."
+- Do not commit `package-lock.json` if there are no deps; if a dep is justified later, the PR adding it must update the README + CI gate.
 
 **Warning signs:**
-- Trailer lookup code uses `.lower()` rather than `.casefold()`
-- Trailer lookup uses `normalize_key()` rather than `_norm_for_match()`
+- A new top-level `node_modules/` appears in git status.
+- `package-lock.json` size growth.
+- `require()` of a non-`node:` builtin in any `make-scripts/*.js`.
 
-**Phase to address:**
-TRAIL-01 — implementation step.
+**Phase to address:** MAKE-TEST-01 — same plan that introduces `package.json`.
 
 ---
 
-### Pitfall 12: `product_result` ghost key in `quizify-mapping.js:103` (CONTRACT-01)
+### Pitfall 12: Snapshot/fixture drift in JS tests masks real regressions
 
 **What goes wrong:**
-Line 103 of `quizify-mapping.js` reads `record.product_result || null`. The Python CLI never emits a `product_result` key — D-05's locked tail uses `product-recommendation` (hyphenated). This line always evaluates to `null` and was presumably intended to read `record["product-recommendation"]`. Line 102 already reads `record["product-recommendation"]` correctly, so line 103 is a silent dead-code duplicate with a wrong key name. If line 102 is removed during a future refactor (confusing it with the duplicate), the `product_recommendation` output field silently becomes null for all records.
+The Node harness uses snapshot-style tests (`assert.deepStrictEqual(actual, expected)` with `expected` as inline literal). A contributor changes mapping behavior and updates the snapshot to match — the test passes, the regression ships.
 
 **Why it happens:**
-The key was renamed at some point during v1.0 development (from underscore to hyphen convention) and the JS was not updated. Both keys look plausible; the bug is invisible at runtime because JavaScript returns `undefined` for missing object keys, which `|| null` coerces to `null`.
+Snapshot-update is a 30-second action; reviewing whether the new snapshot is *correct* requires re-deriving the expected mapping from `make-scripts/CONVENTIONS.md`. Reviewers don't.
 
 **How to avoid:**
-CONTRACT-01 removes line 103 entirely (or renames it to something intentional if there was a reason to have both). Add a manual verification note to the CONTRACT-01 plan: run the JS against `quizify-submissions.csv` sample and assert `product_recommendation` is non-null for rows where the Python emits a non-null `product-recommendation`. The `docs/quizify-submissions.csv` sample currently has `product-recommendation: null` for all rows (per `test_every_row_has_reserved_placeholders`), so you need a synthetic fixture with a non-null value to verify the fix.
+- Write tests against **derived expectations**, not snapshots: `assert.equal(out["product-recommendation"], "peri_menu")` — each assertion ties back to a documented contract line in `CONVENTIONS.md`.
+- Where snapshots are unavoidable (full output object), require the snapshot file to be paired with a comment block citing the CONVENTIONS.md section that justifies it; PR review enforces.
+- Cross-check: at least one Python-side test should round-trip the CLI output through a Node child-process invocation of `mapRecord` and assert structural expectations. Optional but high-value for v1.2 since `make-scripts/` is now co-owned.
 
 **Warning signs:**
-- `product_recommendation` is `null` in Make.com output even after fix
-- No test fixture with a non-null `product-recommendation` value
+- Snapshot diff in PR with no corresponding CONVENTIONS.md change.
+- Reviewer comment "looks good, snapshot updated" without explanation.
 
-**Phase to address:**
-CONTRACT-01 — implementation and manual-verification plan.
+**Phase to address:** MAKE-TEST-01.
 
 ---
 
-### Pitfall 13: `peri_menu` vs `peri-menu` tag mismatch breaks `is_peri_meno` life-stage (MAKE-FIX-01)
+### Pitfall 13: `--validate` semantics drift between non-stream + stream + post modes
 
 **What goes wrong:**
-`quizify-mapping.js:167` calls `process_filter_tag(output.menopause_status, "peri", "peri_menu")`, which pushes the tag `"peri_menu"` (underscore). `score-calculations.js:213` checks `hasTag(tags, "peri-menu")` (hyphen). These never match. Every peri-menopausal respondent gets `life_stage = "life_stage_unspecified"` instead of `"peri_menopause_menopause"`. The fix must pick one spelling and apply it to both files.
+Three emit paths — JSON-array (default), NDJSON stream, HTTP POST — each with `--validate`. Subtle differences creep in: array mode validates whole document; stream mode validates per row (Pitfall 8); POST mode validates… which? Per request? Whole batch? Different exit codes? Different stderr templates?
 
 **Why it happens:**
-The two files were written independently. JS object-property naming conventions in `quizify-mapping.js` favour underscores for emitted tag names (see `"has_red_flags"`, `"is_athlete"`, etc.). Someone used a hyphen in the `hasTag` check in `score-calculations.js` without checking the emitting side.
+Each mode is implemented in its own plan; the shared validator helper grows mode-specific branches; locked PII-safe stderr templates from D-06-19/D-06-20 are reused without re-locking for new modes.
 
 **How to avoid:**
-The canonical spelling is `peri_menu` (underscore) to match all other tag names in `quizify-mapping.js`. Fix `score-calculations.js:213` to use `hasTag(tags, "peri_menu")`. Do NOT change `quizify-mapping.js:167` — that is the emitting side and the canonical source. After the fix, confirm with the user whether any Airtable formula or email-template condition currently checks for `"peri-menu"` (hyphen); if so, that consumer also needs updating. Add this to the manual verification checklist.
+- Single contract: per-row item validation is canonical; whole-array validation in default mode is a thin wrapper that iterates. Both modes use the same `_validate_item` function with the same error template.
+- POST mode: validate the whole batch first (using the shared per-row iteration), then POST. POST never partially-succeeds-then-validates.
+- Lock new stderr templates as D-06-2x additions in the v1.2 decision register.
+- Cross-mode test matrix: same malformed fixture × `{array, ndjson, post}` × `{--validate, no --validate}` = 6 cells. Assert exit codes + stderr templates form a coherent table.
 
 **Warning signs:**
-- `life_stage` is always `"life_stage_unspecified"` for peri-menopausal respondents in Make.com output
-- No peri-menopausal respondent in `quizify-submissions.csv` sample to catch the bug in manual testing
+- A test only covers `--validate` in one emit mode.
+- Stderr template strings appear duplicated in source (drift waiting to happen).
 
-**Phase to address:**
-MAKE-FIX-01 — implementation; requires sample-coverage check before closing the plan.
+**Phase to address:** AUTO-01 + STREAM-01 — explicitly in the integration check between the two phases (mirroring v1.1's `INTEGRATION-CHECK.md` pattern).
 
 ---
 
-### Pitfall 14: `is_athlete` inverted condition — fixing it changes customer-facing email routing (MAKE-FIX-01)
+### Pitfall 14: HTTP retries amplify PII exposure and duplicate webhook deliveries
 
 **What goes wrong:**
-`score-calculations.js:247-250`:
-```js
-let activity_profile = "non_athlete";
-if (!data.is_athlete) {
-    activity_profile = "athlete";
-}
-```
-This is logically inverted: `!is_athlete` sets `"athlete"`. All non-athlete respondents have received `activity_profile = "athlete"` since the module was deployed. `email_template_id` is NOT gated on `activity_profile`, so email routing is unaffected — but `activity_profile` is pushed into `out.tags` and flows to Airtable. Any Airtable view or automation that filters by `activity_profile == "athlete"` is currently selecting non-athletes.
+Naive retry-on-network-error retries on 5xx and timeouts. If Make.com received the request but its response was lost (proxy timeout, partial TLS close), the retry creates a duplicate scenario run — two emails to the same respondent, double-counted scoring. Worse: if the first request leaked PII to a wrong endpoint (Pitfall 5), the retry leaks again.
 
 **Why it happens:**
-A copy-paste inversion. The variable initialized to `"non_athlete"` suggests the intent was `if (data.is_athlete) { activity_profile = "athlete"; }`.
+"Resilient" feels like the right default; `urllib3`/`tenacity`-style retry recipes are everywhere; nobody pauses to ask "is POST idempotent on this endpoint?"
 
 **How to avoid:**
-Before merging this fix, confirm with the user: (a) Is `activity_profile` used in any active Airtable formula, automation, or view? (b) Has any email campaign been segmented by `activity_profile`? If yes, the fix changes which real users are in which segment — this is a customer-facing semantic change, not just a code fix. Document the decision in `PROJECT.md` Key Decisions. Only after user confirmation, fix the condition to `if (data.is_athlete)`. The MAKE-FIX-01 plan must include a "user confirmation gate" before merging.
+- **No retries by default** in v1.2. AUTO-01 ships single-shot POST. Document explicitly.
+- If retries are added later, require either (a) idempotency-key header support on the Make.com side (currently unverified — flag for research) or (b) operator-confirmed `--retry N` flag with dry-run preview.
+- Test asserts: a 503 response from the mock server produces exactly one request, exit non-zero.
 
 **Warning signs:**
-- No user sign-off before the fix is merged
-- No note in MILESTONES.md about the semantic behaviour change
-- `is_athlete` in `data` is `false` for all rows in the sample (peri-only quiz respondents), so the test cannot distinguish correct from incorrect behaviour without an athlete respondent in the fixture
+- Loop-with-sleep in the POST helper.
+- Operator reports duplicate scenarios in Make.com history.
 
-**Phase to address:**
-MAKE-FIX-01 — requires explicit user confirmation step before implementation.
+**Phase to address:** AUTO-01.
 
 ---
 
-### Pitfall 15: CLI surface drift — `--validate` flag addition breaks D-11 drift test (Cross-cutting)
+### Pitfall 15: Make.com webhook URL leaked via shell history, process listing, or error logs
 
 **What goes wrong:**
-`test_readme_help_alignment.py:test_every_flag_named_in_readme` asserts that every long flag produced by `--help` appears in `README.md`. Adding `--validate` to `argparse` without updating the README causes this test to fail. This is the safety net working as designed — but if the developer sees the test failure and "fixes" it by disabling the test or adding the flag text without updating the README structure, the protection breaks.
+The webhook URL contains a secret hook ID (`https://hook.eu2.make.com/abc123XYZ...`). If passed as `--post-url $URL` on the command line, it shows up in `ps aux`, shell history, CI logs, and crash reports. Anyone with the URL can POST scenario-triggering payloads.
 
 **Why it happens:**
-The developer adds the argument to `argparse`, runs the tests, sees a failure in a "doc test", and treats it as noise. The correct interpretation is: the README must be updated before the test can pass.
+It looks like a regular URL, not a secret. Operators paste it into READMEs, scripts, Slack.
 
 **How to avoid:**
-State in the VALI-01 plan that README.md must be updated in the same commit that adds `--validate` to `argparse`. The D-11 drift test failure is expected and correct — it is the gate, not the bug. Add a note to the README `## Development` section explaining that the drift test is intentionally strict. Do not add `--help` to the `flags.discard()` set to hide new flags.
+- Support `--post-url-env QUIZIFY_WEBHOOK_URL` (read URL from named env var) as a first-class alternative to `--post-url`. Document this as the preferred form in README.
+- Refuse to log the URL in stderr (categorical: log host only, not path). Add to PII-safe template lock.
+- Document in README that `--post-url` is acceptable for one-off testing only; production should use the env-var form.
 
 **Warning signs:**
-- `test_every_flag_named_in_readme` fails after adding `--validate`
-- Developer removes the flag from `REQUIRED_SECTIONS` or disables the test
+- Webhook URL grep-able in commit history, `~/.bash_history`, CI logs.
+- Operator reports unexpected scenario triggers.
 
-**Phase to address:**
-VALI-01 — documentation update is part of the implementation plan checklist, not a separate task.
-
----
-
-### Pitfall 16: Test count regression or slow-test budget violation (Cross-cutting)
-
-**What goes wrong:**
-v1.0 has 71 tests passing in 1.09s using a module-scoped fixture for the 12 structural invariants (single subprocess call). VALI-01 schema tests + TRAIL-01 lookup tests + manual-verification scaffolds add new tests. If each schema test spins up a fresh subprocess, test time balloons past the implicit "fast feedback" budget.
-
-**Why it happens:**
-Schema validation tests are easiest to write as end-to-end subprocess tests (mirrors the existing pattern). Adding 10 such tests, each with a 50ms subprocess startup, adds 500ms — already doubling test time.
-
-**How to avoid:**
-Unit-test schema validation at the function level: call the Python validation function directly (not via subprocess) from test. Reserve subprocess-based tests for CLI integration scenarios (e.g. exit-code checks for `--validate` flag). Extend the existing module-scoped `emitted_payload` fixture to include schema validation checks, rather than adding a new subprocess per check. The 71-test suite runs in 1.09s; target no more than 2.5s after v1.1 additions.
-
-**Warning signs:**
-- New test file has its own `subprocess.run(SCRIPT, ...)` for each parametric schema test
-- Total test time exceeds 3s after adding v1.1 tests
-
-**Phase to address:**
-All v1.1 phases — each plan should specify whether new tests are unit tests (fast) or integration tests (subprocess); unit tests are preferred for validation logic.
-
----
-
-### Pitfall 17: `score-calculations.js` recomputes scoring independently from Python `score-value` (Cross-cutting latent risk)
-
-**What goes wrong:**
-Python emits `score-value` as a pass-through string from the CSV (`trailer_cells_decoded[2]`). `score-calculations.js` computes `score_total` from scratch using its own `SCORE_RULES` applied to mapped answer fields. These two values are computed independently and may diverge if Quizify's scoring algorithm changes or if the CSV `score-value` column uses different rules. Currently both are emitted (`out.score_total` vs the pass-through `score-value`), so a consumer might use either, not knowing which is authoritative.
-
-**Why it happens:**
-The JS scoring was written to recompute scores for Make.com's internal routing. The Python pass-through was written to preserve what Quizify itself computed. These are different pipelines that happen to co-exist.
-
-**How to avoid:**
-This is a latent risk — MAKE-FIX-01 scope does not need to fix it, but MUST document it. Add a note to the MAKE-FIX-01 plan or MILESTONES.md: "score_total (JS-computed) vs score-value (Quizify CSV pass-through) are independent values. A post-v1.1 audit should verify whether these agree on the live sample and which is used downstream." Do not silently remove either field.
-
-**Warning signs:**
-- `score_total` and `score-value` disagree for rows in `quizify-submissions.csv`
-- No documentation of which scoring field is authoritative for email template selection
-
-**Phase to address:**
-MAKE-FIX-01 — documentation note only; do not fix in v1.1.
+**Phase to address:** AUTO-01.
 
 ---
 
@@ -360,100 +354,133 @@ MAKE-FIX-01 — documentation note only; do not fix in v1.1.
 
 | Shortcut | Immediate Benefit | Long-term Cost | When Acceptable |
 |----------|-------------------|----------------|-----------------|
-| Positional trailer indexing (`trailer_cells_decoded[0..2]`) | Simple, no config | Silently mis-binds if `--trailer-columns` order changes; was TRAIL-01's root cause | Never — already accepted as debt in v1.0; fix in TRAIL-01 |
-| Schema `required` listing only "obvious" keys | Faster to write | Silent acceptance of structurally incomplete payloads | Never |
-| Module-top `import jsonschema` | Cleaner code | Breaks stdlib-only guarantee for non-validation users | Never — lazy import is required |
-| Fallback-to-positional on name-lookup miss | Avoids crash | Re-introduces the exact bug being fixed | Never |
-| Using `json.dumps()` defaults in tests | Less typing | `ensure_ascii=True` default diverges from production serialization | Never in schema/roundtrip tests |
-
----
+| Inline `urlopen(url, data=payload)` with no helper | One fewer function | Timeout/SSL/redirect/retry policy scattered or missing; PII-safe error path duplicated | Never — extract `_post_payload(url, payload, *, timeout, opener)` helper from the start |
+| Skip atomic-rename for streaming output | Saves ~10 lines | Silent data corruption in pipelines on any mid-stream error | Never for STREAM-01 (data integrity is the feature) |
+| Snapshot-only JS tests (no derived assertions) | Fast initial coverage | Real regressions ship behind passing tests (Pitfall 12) | MVP only — must convert to property-based assertions before MAKE-TEST-01 phase exit |
+| `--validate` only in array mode (skip stream-mode integration) | Shorter STREAM-01 plan | AUTO-01 gating premise breaks at scale (>50k CSVs bypass validation) | Never — VALI-01 contract from v1.1 is non-negotiable |
+| Add `ajv` to `package.json` for JS-side schema check | Free extra coverage | Violates D-13-spirit, breaks Make.com runtime, npm transitive-tree bloat | Never |
+| Log full HTTP error response body behind `--verbose` | Easier debugging | T-PII-01 violation gated on a flag is still a violation | Never — categorical only, `--verbose` adds counts not contents |
+| Reuse v1.1 PII-safe stderr templates verbatim for HTTP errors | Consistency | They were locked for *validation* error shape — HTTP errors have different fields (status, reason, class) | Never — lock new D-06-2x templates for HTTP surfaces |
+| Single `--post-url` flag without env-var alternative | Smaller surface | Webhook URL leaks via shell history / `ps aux` (Pitfall 15) | Never for production; CLI-only acceptable for `--dry-run` previews |
 
 ## Integration Gotchas
 
 | Integration | Common Mistake | Correct Approach |
 |-------------|----------------|------------------|
-| Python CLI → Make.com Module 1 | Validate Python output only; forget JS reads it | Run manual verification of `quizify-mapping.js` output after any Python key-name change |
-| `quizify-mapping.js` → `score-calculations.js` | Edit Module 1 without checking Module 2 consumers | `process_filter_tag(..., "peri_menu")` output feeds `hasTag(tags, ...)` in Module 2; any tag-name change in Module 1 must update Module 2 |
-| `score-calculations.js` → Airtable | Fix inverted condition without checking Airtable segments | `activity_profile` flows to `out.tags`; confirm with user before merging `is_athlete` fix |
-| `--validate` flag → README drift test | Add argparse flag, run tests, see "doc test" fail, disable it | README update is part of the same commit; drift test is the gating mechanism |
-| `jsonschema` error output → stderr | Log full `str(error)` which includes `.instance` (the cell value) | Log only `error.json_path` + `error.validator`; never `error.instance` |
+| Make.com webhook | Treat `200 OK` as "scenario ran successfully" | Make.com 200s on receipt, not on scenario completion; document this — any per-record outcome must come from a separate channel or be validated client-side via `--validate` before send |
+| Make.com webhook | Send NDJSON to a webhook expecting a JSON array | Webhook content-type is `application/json` of an array — POST mode in v1.2 sends the **JSON-array form** of the batch, not NDJSON. NDJSON is for file output (`-o`); HTTP is array-bodied. Lock this in AUTO-01 plan |
+| `urllib.error.URLError` | Catch only `HTTPError` | `URLError` is the parent (DNS, connection refused, TLS); `HTTPError` is the subclass (4xx/5xx). Catch `(HTTPError, URLError)` with class-aware branching |
+| `http.client.RemoteDisconnected` | Not caught by `URLError` handler in older Pythons | Add to except tuple; emit categorical `network_disconnect` |
+| Make.com IIFE sandbox | Use `console.log` for debug | Make.com sandbox redirects/strips `console`; debug via `output` shape only — document in `CONVENTIONS.md` |
+| `node:test` | Assume Jest-style globals (`describe`, `it`, `expect`) | Use `import {test} from "node:test"; import assert from "node:assert/strict"` — different API surface |
+| `pyproject.toml` `[validate]` extra | Add `urllib3` or `requests` for AUTO-01 | D-13 says stdlib at runtime — AUTO-01 uses `urllib`. No new dependencies. The `[validate]` extra remains the only optional |
 
----
+## Performance Traps
+
+| Trap | Symptoms | Prevention | When It Breaks |
+|------|----------|------------|----------------|
+| Whole-array validation in stream mode | RAM spike to multi-GB on >50k rows; defeats STREAM-01 | Per-row validation against `schema["items"]` (Pitfall 8) | At ~50k rows on typical CI runner (~2GB RAM) |
+| `json.dumps` with default `indent=2` in stream mode | NDJSON lines contain embedded newlines → unparseable | Force `indent=None, separators=(",", ":")` in stream emit | Immediately on first stream emit |
+| fastjsonschema schema recompilation per row | 100x slowdown | Compile once outside the row loop (already correct in v1.1; preserve in stream refactor) | At ~1k rows |
+| Synchronous POST per row (if anyone proposes it) | 50k POSTs × 200ms RTT = 2.7 hours, 50k webhook invocations | POST the whole batch as a single JSON array; if Make.com has size limits, chunk explicitly with operator-visible flag | At any rate beyond test scale |
+| Reading entire CSV into memory before streaming | Negates STREAM-01 | Use `csv.DictReader(file)` iterator pattern; never `list(reader)` in stream path | At ~100k rows |
 
 ## Security Mistakes
 
 | Mistake | Risk | Prevention |
 |---------|------|------------|
-| Logging `jsonschema` `ValidationError` verbatim | PII leakage: failing field value (email, phone) appears in stderr / log aggregator | Filter to `json_path` + `validator` only; add T-PII-01 test for validation errors |
-| Emitting PII in `--validate` summary report | Email/name in validation failure summary output | Apply same T-PII-01 pattern: name the key path, not the cell value |
-| Schema stored with example payload data | Real user email in schema fixtures | Schema tests must use synthetic fixtures with fake PII; never copy rows from `quizify-submissions.csv` |
+| HTTP error body logged to stderr (Pitfall 2) | PII leak via response echoes | Categorical-only template; negative-substring tests against fixture PII |
+| Webhook URL on command line (Pitfall 15) | Secret leaks via `ps`, history, CI logs | `--post-url-env` env-var form documented as preferred |
+| TLS verification disabled (Pitfall 4) | MITM exposes PII in transit | `ssl.create_default_context()`; HTTPS-only URL check; CI grep gate |
+| Following redirects silently (Pitfall 5) | PII delivered to attacker-controlled host on hijacked DNS or misconfigured webhook | Custom redirect handler that refuses or restricts |
+| `--validate` bypassed in POST mode | Schema-invalid PII payload sent to Make.com | argparse mutual-requirement check; "zero requests on invalid payload" integration test |
+| JS test fixtures using real PII from `quizify-submissions.csv` | PII committed to git in test files | Synthetic fixtures only; extend `CONVENTIONS.md` rule (already present from v1.1) to test directory |
+| `package-lock.json` commits transitive dep tree without review | Supply-chain risk in `make-scripts/` | Zero-dep policy (Pitfall 11); CI gate on empty `dependencies`/`devDependencies` |
 
----
+## UX Pitfalls
+
+| Pitfall | User Impact | Better Approach |
+|---------|-------------|-----------------|
+| `--post` succeeds silently with no confirmation of what was sent | Operator can't audit what hit Make.com | Print categorical summary to stderr: "POST sent: rows=N bytes=M status=200" — counts only, never content |
+| `--post` requires `--validate` but error message is generic argparse | Confusion, support burden | Custom `parser.error("--post requires --validate (AUTO-01 gates POST on schema validity)")` |
+| Streaming output silently overwrites existing file | Data loss when re-running | If `-o path` exists and `--force` not passed, refuse and exit non-zero — document in README |
+| NDJSON file looks valid but has CRLF line endings | Downstream pipelines on Linux/Mac break in non-obvious ways | Force `newline="\n"` in `open()`; test asserts no `\r` bytes (Pitfall 6) |
+| `--help` text doesn't mention AUTO-01 ↔ VALI-01 dependency | Operators try `--post` standalone, get cryptic error | argparse epilog explains the gating contract; D-11 README drift test catches doc gaps |
+| Make.com side fix lands but operators don't know they need to update the scenario | JS module changes ship but Make.com still runs the old one | Document Make.com side update steps in README "Deployment" or `CONVENTIONS.md` |
 
 ## "Looks Done But Isn't" Checklist
 
-- [ ] **VALI-01 schema:** `additionalProperties: false` is present AND `patternProperties` covers `question-N`/`answers-N`/`answers-tags-N` — verify schema rejects extra fixed keys but accepts new question columns
-- [ ] **VALI-01 schema:** `required` array matches `PHASE_3_REQUIRED_KEYS` union contact keys — verify by parametric drop-key test
-- [ ] **VALI-01 import:** `import jsonschema` is inside the validation function, not at module top — verify by running CLI without `--validate` in a venv where `jsonschema` is not installed
-- [ ] **VALI-01 PII:** validation error logging omits `.instance` — verify by T-PII-01 pattern test
-- [ ] **TRAIL-01 lookup:** name lookup uses exact NFC+casefold equality, not substring — verify with scrambled `--trailer-columns` fixture
-- [ ] **TRAIL-01 fallback:** no positional fallback branch — grep for `trailer_cells_decoded[0]` outside the legacy path
-- [ ] **CONTRACT-01:** `product_result` dead-key line removed from `quizify-mapping.js` — verify manually that `product_recommendation` is non-null when Python emits non-null `product-recommendation`
-- [ ] **MAKE-FIX-01 peri tag:** `score-calculations.js` uses `peri_menu` (underscore) — grep for `peri-menu` (hyphen) and confirm absence
-- [ ] **MAKE-FIX-01 athlete:** user has confirmed `activity_profile` behaviour change before merge
-- [ ] **Cross-cutting README:** `--validate` appears in README.md `## CLI reference` section before any test run
-- [ ] **Cross-cutting sample coverage:** manual verification fixture includes at least one peri-menopausal respondent and one athlete respondent
-
----
+- [ ] **AUTO-01 POST helper:** Often missing explicit `timeout=` — verify grep `urlopen(` in source has `timeout=` on every call.
+- [ ] **AUTO-01 PII-safe error logger:** Often missing negative-substring test against real-shape error bodies — verify `TestHTTPErrorPIIsafe` exists with email/phone/free-text fixtures.
+- [ ] **AUTO-01 ↔ VALI-01 gate:** Often missing "zero requests on invalid payload" integration test — verify mock-server test exists with `assert mock.request_count == 0`.
+- [ ] **AUTO-01 redirect/SSL hardening:** Often missing — verify (a) HTTPS-only URL check at argparse, (b) custom redirect handler refusing cross-host, (c) no `_create_unverified_context` in source (CI grep gate).
+- [ ] **STREAM-01 atomic write:** Often missing — verify `os.replace(tmp, final)` pattern and SIGINT mid-stream test.
+- [ ] **STREAM-01 NDJSON correctness:** Often missing — verify final `\n`, no `\r`, round-trip read+parse, byte-identity vs v1.1 golden when re-aggregated.
+- [ ] **STREAM-01 + VALI-01:** Often missing — verify per-row validation uses `schema["items"]`; test with malformed row mid-stream.
+- [ ] **MAKE-TEST-01 IIFE refactor:** Often missing — verify pure function `mapRecord(record)` is exported and the Make.com adapter is the only thing referencing globals.
+- [ ] **MAKE-TEST-01 `package.json`:** Often missing — verify zero `dependencies`, zero `devDependencies` (uses `node:test`), CI gate enforces.
+- [ ] **MAKE-TEST-01 globals snapshot test:** Often missing — verify `globalThis` keys are unchanged across `mapRecord(fixture)` calls.
+- [ ] **MAKE-COSMETIC-01/02:** Often "fixed" but not test-locked — verify a test would fail if the typo / dead init were re-introduced.
+- [ ] **D-11 README ten-section lock:** Often broken when documenting `--post`/`-o ndjson` — verify `tests/test_readme_help_alignment.py` still 2/2 green and section count unchanged.
+- [ ] **D-05 top-level key order:** Often perturbed when adding fields for HTTP response metadata — verify v1.1 golden fixture byte-identity test still passes (no new top-level keys added to records).
+- [ ] **T-PII-01:** Often missed for new HTTP surfaces — verify negative-substring tests cover stderr from POST path with realistic error-body fixtures.
 
 ## Recovery Strategies
 
 | Pitfall | Recovery Cost | Recovery Steps |
 |---------|---------------|----------------|
-| `additionalProperties: false` rejects new columns | LOW — schema-only change | Add pattern to `patternProperties`; re-run `--validate` |
-| `jsonschema` top-level import breaks CI | LOW | Move import inside function; all other tests unaffected |
-| PII in validation error logs | MEDIUM | Audit log aggregator for leaked values; patch logging immediately; rotate any exposed tokens |
-| `is_athlete` inverted condition merged without user sign-off | HIGH — customer-facing | Revert commit; audit which Make.com runs used the wrong profile; notify affected Airtable automations |
-| `peri_menu` / `peri-menu` mismatch persists post-fix | LOW | Fix one-character change in `score-calculations.js:213`; no Python changes needed |
-| D-11 drift test permanently disabled | MEDIUM — loss of safety net | Restore test; update README; add CI note to never disable this test |
-
----
+| HTTP error body leaked PII to stderr (Pitfall 2) shipped to operators | HIGH | Treat as security incident: scrub CI logs, rotate webhook URL with Make.com, patch + emergency release, add the leaked-fixture pattern to permanent regression suite |
+| TLS verification disabled in shipped release (Pitfall 4) | HIGH | Rotate webhook URL; assume MITM possible for the exposed window; patch + emergency release |
+| Streaming partial-file consumed downstream (Pitfall 7) | MEDIUM | Replay original CSV with fixed atomic-rename build; reconcile downstream state by row count; add atomic-rename pattern + SIGINT test |
+| NDJSON CRLF/trailing-newline issue (Pitfall 6) | LOW | Re-emit with corrected writer; one-shot fix; add byte-pattern test |
+| Make.com IIFE refactor broke production scenario (Pitfall 9/10) | MEDIUM | Revert the JS file; fix; redeploy with strict-mode + globals-snapshot test |
+| `package.json` runtime deps committed (Pitfall 11) | LOW | Revert; restore zero-dep policy; CI gate prevents recurrence |
+| `--validate`/`--post` race shipped a schema-invalid POST (Pitfall 3) | HIGH | Audit Make.com scenario history for invalid invocations; patch with mutual-requirement gate + integration test; cut release |
+| Webhook URL leaked via command line (Pitfall 15) | MEDIUM | Rotate webhook URL with Make.com; ship `--post-url-env` form; document in README |
 
 ## Pitfall-to-Phase Mapping
 
 | Pitfall | Prevention Phase | Verification |
 |---------|------------------|--------------|
-| `additionalProperties` breaks dynamic columns | VALI-01 — schema design step | Parametric test: K+1 question columns passes `--validate` |
-| `required` subset drift | VALI-01 — schema authoring | Parametric drop-key test: each required key missing → `ValidationError` |
-| Runtime dependency breaks stdlib guarantee | VALI-01 — plan constraint | Test: CLI without `--validate` works with `jsonschema` absent |
-| PII in ValidationError logs | VALI-01 — error-reporting impl | T-PII-01 test: email in failing field → absent from stderr |
-| `answers-N` empty/string/array ambiguity | VALI-01 — schema definition | Schema test: all three shapes from `test_answers_key_is_str_or_object_list` pass |
-| JSON Schema draft mismatch | VALI-01 — plan authoring | Test: schema file contains expected `$schema` URI |
-| `ensure_ascii` serialization divergence | VALI-01 — serialization helper | Test: Spanish-character question text passes roundtrip without entity escapes |
-| `--dry-run` + `--validate` interaction | VALI-01 — CLI design | Test: `--dry-run --validate` produces documented behaviour |
-| Substring match collision | TRAIL-01 — implementation | Unit test: trailer with two "score" headers; correct cell mapped |
-| Silent positional fallback | TRAIL-01 — plan authoring | Test: scrambled `--trailer-columns` → correct field mapping; no fallback |
-| Normalization mismatch in lookup | TRAIL-01 — implementation | Unit test: mixed-case + accented trailer header still resolves |
-| `product_result` ghost key | CONTRACT-01 — implementation | Manual verification: non-null `product-recommendation` → non-null JS output |
-| `peri_menu` vs `peri-menu` | MAKE-FIX-01 — implementation | Manual check: `grep "peri-menu" score-calculations.js` returns nothing after fix |
-| `is_athlete` inversion | MAKE-FIX-01 — user confirmation gate | User sign-off recorded in MILESTONES.md before merge |
-| CLI surface drift (D-11) | VALI-01 — README update in same commit | `test_every_flag_named_in_readme` passes |
-| Test time budget | All phases — unit-test preference | `pytest --tb=short -q` completes in ≤ 2.5s after v1.1 |
-| `score_total` vs `score-value` divergence | MAKE-FIX-01 — doc note only | Documented in MILESTONES.md; audit deferred to post-v1.1 |
+| 1. urllib no-timeout | AUTO-01 | grep CI gate + unit test asserts `timeout=` kwarg |
+| 2. Error body leaks PII | AUTO-01 | `TestHTTPErrorPIIsafe` negative-substring test against PII fixtures |
+| 3. VALI-01↔AUTO-01 race | AUTO-01 (with VALI-01 cross-ref) | mock-server integration test: 0 requests on schema failure |
+| 4. SSL disabled | AUTO-01 | grep CI gate (`CERT_NONE`, `_create_unverified_context`); HTTPS-only argparse check |
+| 5. Silent redirects | AUTO-01 | Mock-server test: 302 cross-host → exit non-zero |
+| 6. NDJSON newline | STREAM-01 | Byte-pattern test (final `\n`, no `\r`); round-trip parse |
+| 7. Partial-write atomicity | STREAM-01 | SIGINT mid-stream test; assert `.tmp` exists, final does not |
+| 8. Per-row vs whole-stream validation | STREAM-01 (cross-ref VALI-01) | Cross-mode test matrix; malformed-row-in-position-50 test |
+| 9. IIFE not importable | MAKE-TEST-01 | Pure-function refactor lands first; sandbox-equivalent test |
+| 10. Globals pollution | MAKE-TEST-01 | `"use strict"` + `globalThis`-keys snapshot test |
+| 11. `package.json` deps creep | MAKE-TEST-01 | CI gate: empty `dependencies`/`devDependencies` |
+| 12. Snapshot drift | MAKE-TEST-01 | Property-based assertions citing CONVENTIONS.md sections |
+| 13. `--validate` semantics drift | AUTO-01 + STREAM-01 integration check | Cross-mode 6-cell test matrix in `INTEGRATION-CHECK.md` |
+| 14. Retry duplicates | AUTO-01 | No-retry-default test: 503 → exactly one request |
+| 15. Webhook URL leak | AUTO-01 | `--post-url-env` form documented; URL not logged |
 
----
+## T-PII-01 Carry-Forward (Explicit)
+
+T-PII-01 was scoped in v1.0 to *stderr from CSV-decode and validation paths*. v1.2 introduces new stderr-emitting surfaces; each must inherit the contract:
+
+| New surface (v1.2) | T-PII-01 obligation | Test class to add |
+|---|---|---|
+| HTTP success log line | Status code + byte count only; no URL path, no response body | `TestHTTPSuccessPIIsafe` |
+| HTTP error log line (4xx/5xx) | Status + reason + categorical class + body byte length; never body bytes, never request body, never URL path | `TestHTTPErrorPIIsafe` |
+| HTTP network-failure log line (timeout/DNS/TLS/disconnect) | Categorical class only (`network_timeout`, `dns_failure`, `tls_failure`, `network_disconnect`); never original URL, never partial response data | `TestHTTPNetworkFailurePIIsafe` |
+| Streaming partial-file warning on abort | Path of `.tmp` file (acceptable — operator-supplied), row count progressed, categorical reason; never row content | `TestStreamAbortPIIsafe` |
+| Per-row validation failure in stream mode | JSON Pointer + row index; never cell content (matches existing VALI-01 D-06-19 template, applied per-item) | `TestStreamValidationPIIsafe` |
+
+**Lock new templates as D-06-2x decisions in the v1.2 plan register**, parallel to v1.1's D-06-19/D-06-20 lock for validation stderr. Negative-substring assertions against email/phone/free-text fixtures from `quizify-submissions.csv` are the canonical verification.
 
 ## Sources
 
-- Direct code inspection: `quizify_csv_ingest.py` lines 261-268 (positional trailer indexing), `quizify-mapping.js` lines 102-103 (ghost key), `score-calculations.js` lines 213 and 247-250 (tag mismatch and inverted condition)
-- `tests/test_structural_invariants.py` — `PHASE_3_REQUIRED_KEYS` frozenset and `test_key_order_locked` as canonical contract references
-- `tests/test_logging_pii.py` — T-PII-01 contract pattern (negative substring assertions)
-- `tests/test_readme_help_alignment.py` — D-11 drift test mechanics
-- `PROJECT.md` constraints section: "Stdlib-only at runtime; no `requirements.txt` (D-13)"
-- `PROJECT.md` key decisions: positional indexing flagged as `⚠️ Revisit` with explicit TRAIL-01 note
-- `jsonschema` library behaviour: ValidationError `.instance` attribute carries failing value; confirmed by library design
-- `MILESTONES.md` v1.0 stats: 71 tests / 1.09s as the performance baseline
+- Python stdlib documentation: `urllib.request`, `urllib.error`, `http.client`, `ssl`, `csv`, `json`, `os.replace` — verified against Python 3.7+ behavior; HIGH confidence on documented defaults (no-timeout, redirect handler, default SSL context).
+- ndjson.org spec — line-delimited JSON convention; HIGH confidence on `\n` termination requirement.
+- Node.js `node:test` and `node:assert` (Node 18+ LTS) — built-in test runner removes need for jest/mocha; HIGH confidence on availability.
+- Make.com (Integromat) IIFE sandbox shape — inferred from existing `make-scripts/quizify-mapping.js` and `score-calculations.js` structure plus `make-scripts/CONVENTIONS.md` from v1.1; MEDIUM confidence on exact sandbox semantics — MAKE-TEST-01 plan should validate empirically before locking the conditional-export pattern.
+- `.planning/PROJECT.md` (T-PII-01, D-05, D-11, D-13, VALI-01 lineage) — HIGH confidence (in-repo source of truth).
+- `.planning/MILESTONES.md` v1.1 entry (deferred items list, D-06-19/D-06-20 stderr template lock pattern) — HIGH confidence.
 
 ---
-*Pitfalls research for: Quizify CSV → Webhook JSON v1.1 Contract Hardening & Make.com Alignment*
-*Researched: 2026-05-03*
+*Pitfalls research for: stdlib-Python CLI adding HTTP egress + NDJSON streaming + Node test harness, v1.2 milestone*
+*Researched: 2026-05-05*
