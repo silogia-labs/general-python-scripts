@@ -1,10 +1,17 @@
 ---
 phase: 9
 slug: auto-01-http-post-delivery
-status: draft
-nyquist_compliant: false
-wave_0_complete: false
+status: approved
+nyquist_compliant: true
+wave_0_complete: true
 created: 2026-05-05
+audited: 2026-05-06
+audit_notes: |
+  All AUTO-01..06 covered by green tests. As-built test names diverge from
+  planner-stage names in the map below (cosmetic drift, no coverage gap).
+  Bonus tests beyond the map strengthen AUTO-03/04/05/06 + T-09-02-07.
+  Suite: 32/32 Phase 9 + 5/5 grep gates + 8/8 PII negative-substring + carry-forward green.
+  09-VERIFICATION.md still owed (separate doc).
 ---
 
 # Phase 9 — Validation Strategy
@@ -29,23 +36,23 @@ created: 2026-05-05
 
 | Task ID | Plan | Wave | Requirement | Threat Ref | Secure Behavior | Test Type | Automated Command | Status |
 |---------|------|------|-------------|------------|-----------------|-----------|-------------------|--------|
-| 9-XX | XX | 1 | AUTO-01 | T-PII-01 | Happy-path POST sends array body once; status 200 → exit 0 | integration | `python -m pytest tests/test_http_post.py::test_happy_path_sends_one_request -x` | ⬜ |
-| 9-XX | XX | 1 | AUTO-01 | — | `len(received) == 1` (no retry) | integration | `python -m pytest tests/test_http_post.py::test_exactly_one_request -x` | ⬜ |
-| 9-XX | XX | 1 | AUTO-02 | — | `--post-url` without `--validate` → exit 2 categorical | unit | `python -m pytest tests/test_argparse_post_url.py::test_post_url_requires_validate -x` | ⬜ |
-| 9-XX | XX | 1 | AUTO-02 | T-PII-01 | Schema-invalid CSV + `--post-url --validate` → 0 server requests | integration | `python -m pytest tests/test_http_post.py::test_validation_failure_no_egress -x` | ⬜ |
-| 9-XX | XX | 1 | AUTO-03 | — | Repeatable `--header`; CRLF rejected at argparse | unit | `python -m pytest tests/test_argparse_post_url.py::test_header_crlf_rejected -x` | ⬜ |
-| 9-XX | XX | 1 | AUTO-03 | — | Header missing-colon / empty-name / invalid-name rejected | unit | `python -m pytest tests/test_argparse_post_url.py::test_header_validation -x` | ⬜ |
-| 9-XX | XX | 1 | AUTO-04 | T-PII-01 | `--timeout` default 30; stalled server → exit 3 + `network_timeout` | integration | `python -m pytest tests/test_http_post.py::test_timeout -x` | ⬜ |
-| 9-XX | XX | 1 | AUTO-05 | — | `http://` URL → argparse exit 2 | unit | `python -m pytest tests/test_argparse_post_url.py::test_https_required -x` | ⬜ |
-| 9-XX | XX | 1 | AUTO-05 | T-PII-01 | 302 cross-host → exit 3 + `http_unexpected_redirect`; target URL never logged | integration | `python -m pytest tests/test_http_post.py::test_302_rejected -x` | ⬜ |
-| 9-XX | XX | 1 | AUTO-05 | — | CI grep gate: no `CERT_NONE`/`_create_unverified_context`/`verify=False` | grep | `! grep -nE "CERT_NONE\|_create_unverified_context\|verify=False" quizify-csv-to-json-webhook/quizify_csv_ingest.py` | ⬜ |
-| 9-XX | XX | 1 | AUTO-05 | — | CI grep gate: exactly 1 `ssl.create_default_context()` | grep | `[ "$(grep -c 'ssl.create_default_context' quizify-csv-to-json-webhook/quizify_csv_ingest.py)" = "1" ]` | ⬜ |
-| 9-XX | XX | 1 | AUTO-04/06 | — | CI grep gate: exactly 1 `self._opener.open(` (single-shot, timeout always passed) | grep | `[ "$(grep -c 'self._opener.open(' quizify-csv-to-json-webhook/quizify_csv_ingest.py)" = "1" ]` | ⬜ |
-| 9-XX | XX | 1 | AUTO-06 | T-PII-01 | 502 → exit 3, stderr matches `http_failure reason=http_server_error status=502 reason_class=5xx body_bytes=<N>` | integration | `python -m pytest tests/test_http_post.py::test_502_categorical -x` | ⬜ |
-| 9-XX | XX | 1 | AUTO-06 | T-PII-01 | Negative-substring: PII tokens + response-body markers never on stderr | integration | `python -m pytest tests/test_http_post_pii.py -x` | ⬜ |
-| 9-XX | XX | 1 | (D-13) | — | CI grep gate: no `requests` library import | grep | `! grep -nE "^(import\|from) requests" quizify-csv-to-json-webhook/quizify_csv_ingest.py` | ⬜ |
-| 9-XX | XX | 1 | (carry / D-11) | — | README drift 2/2 green | unit | `python -m pytest tests/test_readme_help_alignment.py -x` | ⬜ |
-| 9-XX | XX | 1 | (carry / TRAIL-03) | — | Default array byte-identity stays green | unit | `python -m pytest tests/test_default_order_regression.py -x` | ⬜ |
+| 9-XX | XX | 1 | AUTO-01 | T-PII-01 | Happy-path POST sends array body once; status 200 → exit 0 | integration | `python -m pytest tests/test_http_post.py::test_happy_path_sends_one_request -x` | ✅ |
+| 9-XX | XX | 1 | AUTO-01 | — | `len(received) == 1` (no retry) | integration | `python -m pytest tests/test_http_post.py::test_exactly_one_request -x` | ✅ |
+| 9-XX | XX | 1 | AUTO-02 | — | `--post-url` without `--validate` → exit 2 categorical | unit | `python -m pytest tests/test_argparse_post_url.py::test_post_url_requires_validate -x` | ✅ |
+| 9-XX | XX | 1 | AUTO-02 | T-PII-01 | Schema-invalid CSV + `--post-url --validate` → 0 server requests | integration | `python -m pytest tests/test_http_post.py::test_validation_failure_no_egress -x` | ✅ |
+| 9-XX | XX | 1 | AUTO-03 | — | Repeatable `--header`; CRLF rejected at argparse | unit | `python -m pytest tests/test_argparse_post_url.py::test_header_crlf_rejected -x` | ✅ |
+| 9-XX | XX | 1 | AUTO-03 | — | Header missing-colon / empty-name / invalid-name rejected | unit | `python -m pytest tests/test_argparse_post_url.py::test_header_validation -x` | ✅ |
+| 9-XX | XX | 1 | AUTO-04 | T-PII-01 | `--timeout` default 30; stalled server → exit 3 + `network_timeout` | integration | `python -m pytest tests/test_http_post.py::test_timeout -x` | ✅ |
+| 9-XX | XX | 1 | AUTO-05 | — | `http://` URL → argparse exit 2 | unit | `python -m pytest tests/test_argparse_post_url.py::test_https_required -x` | ✅ |
+| 9-XX | XX | 1 | AUTO-05 | T-PII-01 | 302 cross-host → exit 3 + `http_unexpected_redirect`; target URL never logged | integration | `python -m pytest tests/test_http_post.py::test_302_rejected -x` | ✅ |
+| 9-XX | XX | 1 | AUTO-05 | — | CI grep gate: no `CERT_NONE`/`_create_unverified_context`/`verify=False` | grep | `! grep -nE "CERT_NONE\|_create_unverified_context\|verify=False" quizify-csv-to-json-webhook/quizify_csv_ingest.py` | ✅ |
+| 9-XX | XX | 1 | AUTO-05 | — | CI grep gate: exactly 1 `ssl.create_default_context()` | grep | `[ "$(grep -c 'ssl.create_default_context' quizify-csv-to-json-webhook/quizify_csv_ingest.py)" = "1" ]` | ✅ |
+| 9-XX | XX | 1 | AUTO-04/06 | — | CI grep gate: exactly 1 `self._opener.open(` (single-shot, timeout always passed) | grep | `[ "$(grep -c 'self._opener.open(' quizify-csv-to-json-webhook/quizify_csv_ingest.py)" = "1" ]` | ✅ |
+| 9-XX | XX | 1 | AUTO-06 | T-PII-01 | 502 → exit 3, stderr matches `http_failure reason=http_server_error status=502 reason_class=5xx body_bytes=<N>` | integration | `python -m pytest tests/test_http_post.py::test_502_categorical -x` | ✅ |
+| 9-XX | XX | 1 | AUTO-06 | T-PII-01 | Negative-substring: PII tokens + response-body markers never on stderr | integration | `python -m pytest tests/test_http_post_pii.py -x` | ✅ |
+| 9-XX | XX | 1 | (D-13) | — | CI grep gate: no `requests` library import | grep | `! grep -nE "^(import\|from) requests" quizify-csv-to-json-webhook/quizify_csv_ingest.py` | ✅ |
+| 9-XX | XX | 1 | (carry / D-11) | — | README drift 2/2 green | unit | `python -m pytest tests/test_readme_help_alignment.py -x` | ✅ |
+| 9-XX | XX | 1 | (carry / TRAIL-03) | — | Default array byte-identity stays green | unit | `python -m pytest tests/test_default_order_regression.py -x` | ✅ |
 
 ## Wave 0 Requirements
 

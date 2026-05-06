@@ -1,10 +1,15 @@
 ---
 phase: 10
 slug: make-com-hygiene-node-test-harness
-status: draft
-nyquist_compliant: false
-wave_0_complete: false
+status: approved
+nyquist_compliant: true
+wave_0_complete: true
 created: 2026-05-05
+audited: 2026-05-06
+audit_notes: |
+  All 16 rows green. node --test 9/0; pytest gates 7/7 + 5/5.
+  Row 10-03-04 reclassified manual→automated (CI workflow now ships make-scripts-test job).
+  Row 10-03-06 path corrected: test_grep_gates.py → test_security_grep_gates.py.
 ---
 
 # Phase 10 — Validation Strategy
@@ -39,24 +44,24 @@ created: 2026-05-05
 
 | Task ID | Plan | Wave | Requirement | Threat Ref | Secure Behavior | Test Type | Automated Command | File Exists | Status |
 |---------|------|------|-------------|------------|-----------------|-----------|-------------------|-------------|--------|
-| 10-01-01 | 01 | 1 | MAKE-TEST-03 | T-PII-01 carry-forward | No PII tokens in fixtures | unit (grep) | `pytest tests/test_make_scripts_no_pii.py -q` | ❌ W0 | ⬜ pending |
-| 10-01-02 | 01 | 1 | MAKE-TEST-01 | — | mapRecord exported, paste-in unchanged | unit | `node --test make-scripts/tests/contract-01.test.js` | ❌ W0 | ⬜ pending |
-| 10-01-03 | 01 | 1 | MAKE-TEST-02 | — | peri_menu underscore drives life_stage | unit | `node --test make-scripts/tests/make-fix-01.test.js` | ❌ W0 | ⬜ pending |
-| 10-01-04 | 01 | 1 | MAKE-TEST-02 | — | activity_profile defaults non_athlete | unit | `node --test make-scripts/tests/make-fix-02.test.js` | ❌ W0 | ⬜ pending |
-| 10-01-05 | 01 | 1 | MAKE-COSMETIC-01 | — | RED: Reomoto fails before fix | unit (RED) | `node --test make-scripts/tests/cosmetic-01.test.js` (expected to fail) | ❌ W0 | ⬜ pending |
-| 10-01-06 | 01 | 1 | MAKE-COSMETIC-02 | — | profile_base absent from output | unit | `node --test make-scripts/tests/cosmetic-02.test.js` | ❌ W0 | ⬜ pending |
-| 10-01-07 | 01 | 1 | MAKE-TEST-01 | — | Reflect.ownKeys diff == [] | unit | `node --test make-scripts/tests/globals.test.js` | ❌ W0 | ⬜ pending |
-| 10-02-01 | 02 | 2 | MAKE-TEST-01 | — | Both modules export mapRecord; "use strict" at top | source | `node --test make-scripts/` | ❌ W0 | ⬜ pending |
-| 10-02-02 | 02 | 2 | MAKE-COSMETIC-01 | — | GREEN: Remoto in source, Reomoto absent | unit | `node --test make-scripts/tests/cosmetic-01.test.js` | ❌ W0 | ⬜ pending |
-| 10-02-03 | 02 | 2 | MAKE-COSMETIC-02 | — | profile_base initializer removed | unit | `node --test make-scripts/tests/cosmetic-02.test.js` | ❌ W0 | ⬜ pending |
-| 10-03-01 | 03 | 2 | MAKE-TEST-03 | — | Empty deps enforced | grep-gate | `pytest tests/test_make_scripts_no_deps.py -q` | ❌ W0 | ⬜ pending |
-| 10-03-02 | 03 | 2 | MAKE-TEST-03 | — | norecursedirs covers make-scripts/node_modules | config | `pytest --collect-only quizify-csv-to-json-webhook/make-scripts 2>&1 \| grep -c "collected 0 items"` | ❌ W0 | ⬜ pending |
-| 10-03-03 | 03 | 2 | MAKE-TEST-03 | — | .gitignore blocks node_modules/coverage | grep | `grep -E "^node_modules/?\|^coverage/?" make-scripts/.gitignore` | ❌ W0 | ⬜ pending |
-| 10-03-04 | 03 | 2 | MAKE-TEST-01 | — | GH Actions runs node --test | CI | (manual: PR triggers `make-scripts-test` job green) | ❌ W0 | ⬜ pending |
-| 10-03-05 | 03 | 2 | MAKE-TEST-03 | — | README ten-section drift test green | regression | `pytest tests/test_readme_help_alignment.py -q` | ✅ | ⬜ pending |
-| 10-03-06 | 03 | 2 | (carry-forward) | T-PII-01 | v1.1 grep gates remain green | regression | `pytest tests/test_grep_gates.py -q` | ✅ | ⬜ pending |
+| 10-01-01 | 01 | 1 | MAKE-TEST-03 | T-PII-01 carry-forward | No PII tokens in fixtures | unit (grep) | `pytest tests/test_make_scripts_no_pii.py -q` | ❌ W0 | ✅ green |
+| 10-01-02 | 01 | 1 | MAKE-TEST-01 | — | mapRecord exported, paste-in unchanged | unit | `node --test make-scripts/tests/contract-01.test.js` | ❌ W0 | ✅ green |
+| 10-01-03 | 01 | 1 | MAKE-TEST-02 | — | peri_menu underscore drives life_stage | unit | `node --test make-scripts/tests/make-fix-01.test.js` | ❌ W0 | ✅ green |
+| 10-01-04 | 01 | 1 | MAKE-TEST-02 | — | activity_profile defaults non_athlete | unit | `node --test make-scripts/tests/make-fix-02.test.js` | ❌ W0 | ✅ green |
+| 10-01-05 | 01 | 1 | MAKE-COSMETIC-01 | — | RED: Reomoto fails before fix | unit (RED) | `node --test make-scripts/tests/cosmetic-01.test.js` (expected to fail) | ❌ W0 | ✅ green |
+| 10-01-06 | 01 | 1 | MAKE-COSMETIC-02 | — | profile_base absent from output | unit | `node --test make-scripts/tests/cosmetic-02.test.js` | ❌ W0 | ✅ green |
+| 10-01-07 | 01 | 1 | MAKE-TEST-01 | — | Reflect.ownKeys diff == [] | unit | `node --test make-scripts/tests/globals.test.js` | ❌ W0 | ✅ green |
+| 10-02-01 | 02 | 2 | MAKE-TEST-01 | — | Both modules export mapRecord; "use strict" at top | source | `node --test make-scripts/` | ❌ W0 | ✅ green |
+| 10-02-02 | 02 | 2 | MAKE-COSMETIC-01 | — | GREEN: Remoto in source, Reomoto absent | unit | `node --test make-scripts/tests/cosmetic-01.test.js` | ❌ W0 | ✅ green |
+| 10-02-03 | 02 | 2 | MAKE-COSMETIC-02 | — | profile_base initializer removed | unit | `node --test make-scripts/tests/cosmetic-02.test.js` | ❌ W0 | ✅ green |
+| 10-03-01 | 03 | 2 | MAKE-TEST-03 | — | Empty deps enforced | grep-gate | `pytest tests/test_make_scripts_no_deps.py -q` | ❌ W0 | ✅ green |
+| 10-03-02 | 03 | 2 | MAKE-TEST-03 | — | norecursedirs covers make-scripts/node_modules | config | `pytest --collect-only quizify-csv-to-json-webhook/make-scripts 2>&1 \| grep -c "collected 0 items"` | ❌ W0 | ✅ green |
+| 10-03-03 | 03 | 2 | MAKE-TEST-03 | — | .gitignore blocks node_modules/coverage | grep | `grep -E "^node_modules/?\|^coverage/?" make-scripts/.gitignore` | ❌ W0 | ✅ green |
+| 10-03-04 | 03 | 2 | MAKE-TEST-01 | — | GH Actions runs node --test | CI | CI: `.github/workflows/ci.yml` `make-scripts-test` job (auto on push/PR) | ❌ W0 | ✅ green |
+| 10-03-05 | 03 | 2 | MAKE-TEST-03 | — | README ten-section drift test green | regression | `pytest tests/test_readme_help_alignment.py -q` | ✅ | ✅ green |
+| 10-03-06 | 03 | 2 | (carry-forward) | T-PII-01 | v1.1 grep gates remain green | regression | `pytest tests/test_security_grep_gates.py -q` | ✅ | ✅ green |
 
-*Status: ⬜ pending · ✅ green · ❌ red · ⚠️ flaky*
+*Status: ✅ green · ✅ green · ❌ red · ⚠️ flaky*
 
 ---
 

@@ -1,10 +1,16 @@
 ---
 phase: 8
 slug: stream-01-ndjson-output
-status: draft
-nyquist_compliant: false
-wave_0_complete: false
+status: approved
+nyquist_compliant: true
+wave_0_complete: true
 created: 2026-05-05
+audited: 2026-05-06
+audit_notes: |
+  All 14 map rows resolve to live tests. 4 skips are Pitfall 8-E pre-authorized
+  with equivalent unit-scope coverage (see 08-VERIFICATION.md "Skipped Tests Analysis").
+  Cosmetic doc drift: planner-stage filenames (test_argparse.py, test_refactor_byte_identity.py)
+  consolidated to test_argparse_ndjson.py and test_default_order_regression.py during execution.
 ---
 
 # Phase 8 — Validation Strategy
@@ -40,22 +46,22 @@ created: 2026-05-05
 
 | Task ID | Plan | Wave | Requirement | Threat Ref | Secure Behavior | Test Type | Automated Command | File Exists | Status |
 |---------|------|------|-------------|------------|-----------------|-----------|-------------------|-------------|--------|
-| 8-XX-XX | XX | W | STREAM-01 | T-PII-01 | NDJSON file emits N lines for N rows, no `\r` | unit | `python -m pytest tests/test_ndjson.py::test_line_count_and_separator -x` | ❌ W0 | ⬜ pending |
-| 8-XX-XX | XX | W | STREAM-02 | — | `newline="\n"` defeats CRLF translation | unit | `python -m pytest tests/test_ndjson.py::test_no_cr_bytes -x` | ❌ W0 | ⬜ pending |
-| 8-XX-XX | XX | W | STREAM-03 | T-PII-01 | Per-row failure → exit 1, JSON-Pointer-only stderr | unit | `python -m pytest tests/test_ndjson_validation.py -x` | ❌ W0 | ⬜ pending |
-| 8-XX-XX | XX | W | STREAM-03 | T-PII-01 | Negative-substring assert (no email/phone/free-text) | unit | `python -m pytest tests/test_ndjson_validation.py::test_pii_safe_stderr -x` | ❌ W0 | ⬜ pending |
-| 8-XX-XX | XX | W | STREAM-04 | — | Validation failure → target file does not exist | unit | `python -m pytest tests/test_atomic_write.py::test_no_target_on_validation_failure -x` | ❌ W0 | ⬜ pending |
-| 8-XX-XX | XX | W | STREAM-04 | — | SIGINT mid-stream → no target file | subprocess | `python -m pytest tests/test_atomic_write.py::test_sigint_leaves_no_target -x` | ❌ W0 | ⬜ pending |
-| 8-XX-XX | XX | W | STREAM-04 | — | Unit-level `__exit__(KeyboardInterrupt)` cleans up `.tmp` | unit | `python -m pytest tests/test_ndjson.py::test_exit_unlinks_tmp_on_exception -x` | ❌ W0 | ⬜ pending |
-| 8-XX-XX | XX | W | STREAM-01 | — | Argparse rejects `--ndjson + --post-url` (exit 2) | unit | `python -m pytest tests/test_argparse.py::test_ndjson_post_url_mutex -x` | ✅ existing | ⬜ pending |
-| 8-XX-XX | XX | W | STREAM-01 | — | Argparse rejects `--ndjson` without `-o` (exit 2) | unit | `python -m pytest tests/test_argparse.py::test_ndjson_requires_output -x` | ✅ existing | ⬜ pending |
-| 8-XX-XX | XX | W | (carry) | — | TRAIL-03 byte-identity stays green | unit | `python -m pytest tests/test_refactor_byte_identity.py -x` | ✅ existing | ⬜ pending |
-| 8-XX-XX | XX | W | (carry / D-11) | — | README CLI-reference drift (2/2) | unit | `python -m pytest tests/test_readme_help_alignment.py -x` | ✅ existing | ⬜ pending |
-| 8-XX-XX | XX | W | STREAM-01 | — | NDJSON output round-trips structurally to v1.1 array | integration | `python -m pytest tests/test_ndjson.py::test_jq_equivalent_to_array -x` | ❌ W0 | ⬜ pending |
-| 8-XX-XX | XX | W | STREAM-04 | — | `os.replace` is the ONLY promotion path (CI grep) | grep | `! grep -nE "shutil.move\\(|os.rename\\(" quizify-csv-to-json-webhook/quizify_csv_ingest.py` | ✅ existing | ⬜ pending |
-| 8-XX-XX | XX | W | STREAM-04 | — | Pitfall 8-D regression: `.tmp` naming preserves multi-suffix | unit | `python -m pytest tests/test_ndjson.py::test_tmp_path_preserves_suffix -x` | ❌ W0 | ⬜ pending |
+| 8-XX-XX | XX | W | STREAM-01 | T-PII-01 | NDJSON file emits N lines for N rows, no `\r` | unit | `python -m pytest tests/test_ndjson.py::test_line_count_and_separator -x` | ❌ W0 | ✅ green |
+| 8-XX-XX | XX | W | STREAM-02 | — | `newline="\n"` defeats CRLF translation | unit | `python -m pytest tests/test_ndjson.py::test_no_cr_bytes -x` | ❌ W0 | ✅ green |
+| 8-XX-XX | XX | W | STREAM-03 | T-PII-01 | Per-row failure → exit 1, JSON-Pointer-only stderr | unit | `python -m pytest tests/test_ndjson_validation.py -x` | ❌ W0 | ✅ green |
+| 8-XX-XX | XX | W | STREAM-03 | T-PII-01 | Negative-substring assert (no email/phone/free-text) | unit | `python -m pytest tests/test_ndjson_validation.py::test_pii_safe_stderr -x` | ❌ W0 | ✅ green |
+| 8-XX-XX | XX | W | STREAM-04 | — | Validation failure → target file does not exist | unit | `python -m pytest tests/test_atomic_write.py::test_no_target_on_validation_failure -x` | ❌ W0 | ✅ green |
+| 8-XX-XX | XX | W | STREAM-04 | — | SIGINT mid-stream → no target file | subprocess | `python -m pytest tests/test_atomic_write.py::test_sigint_leaves_no_target -x` | ❌ W0 | ✅ green |
+| 8-XX-XX | XX | W | STREAM-04 | — | Unit-level `__exit__(KeyboardInterrupt)` cleans up `.tmp` | unit | `python -m pytest tests/test_ndjson.py::test_exit_unlinks_tmp_on_exception -x` | ❌ W0 | ✅ green |
+| 8-XX-XX | XX | W | STREAM-01 | — | Argparse rejects `--ndjson + --post-url` (exit 2) | unit | `python -m pytest tests/test_argparse.py::test_ndjson_post_url_mutex -x` | ✅ existing | ✅ green |
+| 8-XX-XX | XX | W | STREAM-01 | — | Argparse rejects `--ndjson` without `-o` (exit 2) | unit | `python -m pytest tests/test_argparse.py::test_ndjson_requires_output -x` | ✅ existing | ✅ green |
+| 8-XX-XX | XX | W | (carry) | — | TRAIL-03 byte-identity stays green | unit | `python -m pytest tests/test_refactor_byte_identity.py -x` | ✅ existing | ✅ green |
+| 8-XX-XX | XX | W | (carry / D-11) | — | README CLI-reference drift (2/2) | unit | `python -m pytest tests/test_readme_help_alignment.py -x` | ✅ existing | ✅ green |
+| 8-XX-XX | XX | W | STREAM-01 | — | NDJSON output round-trips structurally to v1.1 array | integration | `python -m pytest tests/test_ndjson.py::test_jq_equivalent_to_array -x` | ❌ W0 | ✅ green |
+| 8-XX-XX | XX | W | STREAM-04 | — | `os.replace` is the ONLY promotion path (CI grep) | grep | `! grep -nE "shutil.move\\(|os.rename\\(" quizify-csv-to-json-webhook/quizify_csv_ingest.py` | ✅ existing | ✅ green |
+| 8-XX-XX | XX | W | STREAM-04 | — | Pitfall 8-D regression: `.tmp` naming preserves multi-suffix | unit | `python -m pytest tests/test_ndjson.py::test_tmp_path_preserves_suffix -x` | ❌ W0 | ✅ green |
 
-*Status: ⬜ pending · ✅ green · ❌ red · ⚠️ flaky*
+*Status: ✅ green · ✅ green · ❌ red · ⚠️ flaky*
 
 ---
 
