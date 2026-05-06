@@ -75,7 +75,7 @@
   6. D-13 stdlib-only-at-runtime preserved (only `urllib.request` / `urllib.error` / `ssl` from stdlib added); D-05 JSON key order unchanged; D-11 README ten-section lock + drift test stays green after AUTO-01 documentation lands.
 **Plans:** 2 plans
   - [x] 09-01-PLAN.md — RED scaffolding (TDD): mock_webhook fixture + 4 response handlers + AUTO-01..06 integration/PII/argparse/grep-gate test suites; pre-stage README CLI rows. (32 RED tests collected, 29 failing as expected, 127 baseline green; 2026-05-06)
-  - [ ] 09-02-PLAN.md — GREEN implementation (TDD): _NoRedirectHandler, _log_http_failure, _parse_header, _https_url, real _HttpPostSink body, 3 new argparse flags + 2 post-parse checks, _HttpDeliveryError → exit 3 wiring; final README.
+  - [x] 09-02-PLAN.md — GREEN implementation (TDD): _NoRedirectHandler, _log_http_failure, _parse_header, _https_url, real _HttpPostSink body, 3 new argparse flags + 2 post-parse checks, _HttpDeliveryError → exit 3 wiring; final README. (29 RED tests turned GREEN; 5/5 CI grep gates pass; 158 tests total; 2026-05-05)
 
 ### Phase 10: Make.com Hygiene & Node Test Harness
 **Goal**: The two co-owned Make.com JS modules ship cosmetic fixes locked behind a zero-dependency `node:test` regression net that retroactively covers v1.1 fixes and prevents accidental global writes or npm dependency creep.
@@ -101,5 +101,5 @@
 | 6. JSON Schema Validation           | v1.1 | 4/4 | Complete    | 2026-05-04 |
 | 7. Refactor Scaffolding (no-op)     | v1.2 | 2/2 | Complete    | 2026-05-06 |
 | 8. STREAM-01 NDJSON Output          | v1.2 | 2/2 | Complete    | 2026-05-05 |
-| 9. AUTO-01 HTTP POST Delivery       | v1.2 | 0/2 | Planned     | —          |
+| 9. AUTO-01 HTTP POST Delivery       | v1.2 | 2/2 | Complete    | 2026-05-05 |
 | 10. Make.com Hygiene & Node Tests   | v1.2 | 0/0 | Not started | —          |
