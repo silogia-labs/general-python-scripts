@@ -115,3 +115,84 @@ def scoring_index_map_default() -> dict[str, int]:
     values are positional indices into a default-order trailer.
     """
     return {"Result logic": 0, "Score category": 1, "Score value": 2}
+
+
+# ---------------------------------------------------------------------------
+# Phase 8 (Plan 08-01) — synthetic 100-row CSV factory + PII-token list.
+# T-PII-01-safe: tokens are obviously synthetic; they appear ONLY in the
+# CSV cells of row index 50 so negative-substring assertions on stderr are
+# meaningful. Append-only; no existing fixture is mutated.
+# ---------------------------------------------------------------------------
+
+SYNTHETIC_PII_TOKENS: tuple[str, ...] = (
+    "synth-name-50",
+    "synth-50@example.test",
+    "+99 555 0100",
+    "synth-tag-50",
+)
+
+
+def _synthetic_row(idx: int, malformed: bool = False) -> str:
+    """Build one synthetic CSV line for the 100-row fixture.
+
+    Header layout (13 columns total): 6-column CONTACT_PREFIX + 1 dynamic
+    question column + 6-column DEFAULT_TRAILER.
+
+    For ``idx == 50`` and ``malformed=True`` the cells deliberately embed the
+    SYNTHETIC_PII_TOKENS so any leak into stderr is detectable. The row stays
+    structurally well-formed at the CSV layer (correct column count, valid
+    Subscribed value, ISO-shaped Date) so ``_RowStream`` does not flag it
+    with a length-mismatch / categorical warning — that would conflate with
+    ``_RowValidationError``'s exit-1 path (Pitfall 8-E in 08-RESEARCH.md).
+
+    The schema-side malformation is reserved for a hand-built bad dict in the
+    unit test (RESEARCH §Q8 Option C); the CSV-level fixture pairs with that
+    integration test, which may ``pytest.skip`` if a clean CSV→build_row→
+    schema-violation path cannot be produced. Implementer's discretion per
+    D-08 carry-forward.
+    """
+    if malformed and idx == 50:
+        first, last = "synth-name-50", "Tester"
+        email = "synth-50@example.test"
+        phone = "+99 555 0100"
+        tags = "synth-tag-50"
+    else:
+        first, last = f"First{idx}", f"Last{idx}"
+        email = f"row-{idx}@example.test"
+        phone = f"+1 555 01{idx:02d}"
+        tags = ""
+    prefix = [first, last, email, "false", phone, "Yes"]
+    dynamic = ["55"]  # one neutral cell; satisfies build_row
+    trailer = ["Result A", "Cat A", "100", tags, "01:23", "2026-05-05"]
+    cells = prefix + dynamic + trailer
+
+    def _q(c: str) -> str:
+        return '"' + c.replace('"', '""') + '"'
+
+    return ",".join(_q(c) for c in cells)
+
+
+@pytest.fixture
+def csv_with_bad_row_at_50(tmp_path: Path) -> Path:
+    """Synthetic 100-row CSV with malformed cells at row index 50.
+
+    UTF-8, ``\\n`` line endings (no CRLF — STREAM-02 must not be exercised
+    by the fixture itself). Header matches CONTACT_PREFIX + ["question-1"]
+    + DEFAULT_TRAILER. 100 data rows; row 50 carries SYNTHETIC_PII_TOKENS.
+
+    See ``_synthetic_row`` docstring re: schema malformation strategy.
+    """
+    header_cells = [
+        "First name", "Last name", "Email", "Lead Verified",
+        "Phone", "Subscribed to newsletter",
+        "question-1",
+        "Result logic", "Score category", "Score value",
+        "Answer tags", "Time to complete (mm:ss)", "Date",
+    ]
+    header_line = ",".join('"' + c + '"' for c in header_cells)
+    lines = [header_line]
+    for i in range(100):
+        lines.append(_synthetic_row(i, malformed=(i == 50)))
+    out = tmp_path / "synthetic.csv"
+    out.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    return out
