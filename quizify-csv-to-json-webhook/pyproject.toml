@@ -15,3 +15,6 @@ build-backend = "flit_core.buildapi"
 
 [tool.flit.module]
 name = "quizify_csv_ingest"
+
+[tool.pytest.ini_options]
+norecursedirs = ["make-scripts", "node_modules"]
