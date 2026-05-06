@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: Delivery & Make.com Hygiene
-status: completed
-last_updated: "2026-05-06T04:46:52.535Z"
-last_activity: 2026-05-06 -- Phase 9 marked complete
+status: executing
+last_updated: "2026-05-06T05:15:59.161Z"
+last_activity: 2026-05-06
 progress:
   total_phases: 4
   completed_phases: 3
-  total_plans: 6
-  completed_plans: 6
-  percent: 100
+  total_plans: 9
+  completed_plans: 7
+  percent: 78
 ---
 
 # Project State
@@ -20,14 +20,14 @@ progress:
 See: `.planning/PROJECT.md` (updated 2026-05-04 after v1.1 milestone)
 
 **Core value:** Each CSV submission row becomes one webhook-compatible JSON object — without manual restructuring.
-**Current focus:** Phase 9 — auto-01-http-post-delivery
+**Current focus:** Phase 10 — make-com-hygiene-node-test-harness
 
 ## Current Position
 
-Phase: 9 — COMPLETE
-Plan: 2 of 2 — Plan 09-02 GREEN impl landed; 158 tests passing (127 baseline + 32 Phase 9 − 1 stub-era replaced)
-Status: Phase 9 complete
-Last activity: 2026-05-06 -- Phase 9 marked complete
+Phase: 10 (make-com-hygiene-node-test-harness) — EXECUTING
+Plan: 2 of 3
+Status: Ready to execute
+Last activity: 2026-05-06
 Progress: ███████░░░ 75% (3/4 v1.2 phases done; Phase 9 100% — both plans landed)
 
 ## Phases (v1.2)
@@ -67,6 +67,7 @@ See `.planning/PROJECT.md` Key Decisions table for the consolidated v1.0 + v1.1 
 - D-11 README ten-section lock + drift test (`tests/test_readme_help_alignment.py`, 2/2 green) must stay green after every phase that adds CLI surface area.
 - T-PII-01 carry-forward to HTTP error logging — lock new D-06-2x stderr templates (status + reason class + body byte count only; never response body bytes, never URL path).
 - TRAIL-03 default-order golden-fixture regression must remain green across Phases 7-9.
+- [Phase ?]: Phase 10 Plan 01: MAKE-COSMETIC-02 RED evidence preserved at source-grep level (dead init has no runtime effect); Plan 10-02 removes for cleanliness
 
 ### Pending Todos
 
@@ -89,8 +90,9 @@ None open. Two research-phase flags carried into the planning phase:
 | security | `$QUIZIFY_WEBHOOK_URL` / `--post-url-env` env-var URL form | v1.3 candidate (defer unless operator pain reported) | 2026-05-05 |
 | Phase 07 P02 | 2m | 2 tasks | 1 files |
 | Phase 08 P01 | 10m | 3 tasks | 6 files |
+| Phase 10 P01 | 25min | 3 tasks | 22 files |
 
 ## Session Continuity
 
-Last session: 2026-05-06T04:46:52.531Z
+Last session: 2026-05-06T05:15:49.733Z
 Resume action: Run `/gsd-verify-work 9` to validate Phase 9 close, then `/gsd-transition` to Phase 10 (MAKE-COSMETIC + MAKE-TEST harness). Phase 9 deliverables: real `_HttpPostSink`, `_NoRedirectHandler`, `_log_http_failure`, `_parse_header`, `_https_url`, `_HttpDeliveryError`, `--header`/`--timeout` argparse flags, `_build_parser` factored. 5/5 CI grep gates pass; 158 tests GREEN.

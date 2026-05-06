@@ -28,11 +28,11 @@ Locked deferral: NDJSON+POST cross-product is **out of scope for v1.2** (v1.3 ca
 
 ### Make.com JS Hygiene (MAKE)
 
-- [ ] **MAKE-COSMETIC-01** — `Reomoto` typo at `score-calculations.js:157` → `Remoto`. Phase entry gate: verify not load-bearing in historical exports.
-- [ ] **MAKE-COSMETIC-02** — Dead `profile = "profile_base"` initializer at `score-calculations.js:217` removed. Phase entry gate: verify variable genuinely unread.
-- [ ] **MAKE-TEST-01** — `make-scripts/` gains `node --test` harness (zero deps, locked empty `dependencies`/`devDependencies` via CI gate) covering MAKE-COSMETIC-01/02 + regression for CONTRACT-01, MAKE-FIX-01, MAKE-FIX-02.
-- [ ] **MAKE-TEST-02** — JS modules expose pure `mapRecord(record)` function; `module.exports` conditional on `typeof module !== "undefined"` so deployed Make.com files paste in unchanged. `"use strict";` at top of every JS module; `globalThis` snapshot test detects accidental global writes.
-- [ ] **MAKE-TEST-03** — `pyproject.toml` `[tool.pytest.ini_options]` adds `norecursedirs = ["make-scripts", "node_modules"]`; `make-scripts/.gitignore` blocks `node_modules/` and `coverage/`.
+- [x] **MAKE-COSMETIC-01** — `Reomoto` typo at `score-calculations.js:157` → `Remoto`. Phase entry gate: verify not load-bearing in historical exports.
+- [x] **MAKE-COSMETIC-02** — Dead `profile = "profile_base"` initializer at `score-calculations.js:217` removed. Phase entry gate: verify variable genuinely unread.
+- [x] **MAKE-TEST-01** — `make-scripts/` gains `node --test` harness (zero deps, locked empty `dependencies`/`devDependencies` via CI gate) covering MAKE-COSMETIC-01/02 + regression for CONTRACT-01, MAKE-FIX-01, MAKE-FIX-02.
+- [x] **MAKE-TEST-02** — JS modules expose pure `mapRecord(record)` function; `module.exports` conditional on `typeof module !== "undefined"` so deployed Make.com files paste in unchanged. `"use strict";` at top of every JS module; `globalThis` snapshot test detects accidental global writes.
+- [x] **MAKE-TEST-03** — `pyproject.toml` `[tool.pytest.ini_options]` adds `norecursedirs = ["make-scripts", "node_modules"]`; `make-scripts/.gitignore` blocks `node_modules/` and `coverage/`.
 
 ## Future Requirements (deferred to v1.3+)
 
@@ -68,11 +68,11 @@ Locked deferral: NDJSON+POST cross-product is **out of scope for v1.2** (v1.3 ca
 | AUTO-04          | Phase 9  | Complete |
 | AUTO-05          | Phase 9  | Complete |
 | AUTO-06          | Phase 9  | Complete |
-| MAKE-COSMETIC-01 | Phase 10 | Pending |
-| MAKE-COSMETIC-02 | Phase 10 | Pending |
-| MAKE-TEST-01     | Phase 10 | Pending |
-| MAKE-TEST-02     | Phase 10 | Pending |
-| MAKE-TEST-03     | Phase 10 | Pending |
+| MAKE-COSMETIC-01 | Phase 10 | Complete |
+| MAKE-COSMETIC-02 | Phase 10 | Complete |
+| MAKE-TEST-01     | Phase 10 | Complete |
+| MAKE-TEST-02     | Phase 10 | Complete |
+| MAKE-TEST-03     | Phase 10 | Complete |
 
 **Coverage:** 16/16 v1.2 requirements mapped (REFACTOR=1, STREAM=4, AUTO=6, MAKE=5). No orphans, no duplicates.
 
