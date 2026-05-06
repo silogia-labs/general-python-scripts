@@ -63,6 +63,13 @@ class _StdoutSink:
         json.dump(self._rows, sys.stdout, indent=2, ensure_ascii=False)
         sys.stdout.write("\n")
 
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc, tb):
+        self.close()
+        return False
+
 
 class _FileSink:
     """Buffers rows; emits the JSON array on close() (D-07-03).
@@ -79,6 +86,13 @@ class _FileSink:
             json.dump(self._rows, out_fh, indent=2, ensure_ascii=False)
             out_fh.write("\n")
 
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc, tb):
+        self.close()
+        return False
+
 
 class _HttpPostSink:
     """Phase 7 STUB. Real HTTP POST lands in Phase 9 (AUTO-01..06).
@@ -91,6 +105,57 @@ class _HttpPostSink:
 
     def close(self) -> None:
         return None
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc, tb):
+        self.close()
+        return False
+
+
+class _NdjsonFileSink:
+    """Phase 8 (STREAM-01..04 / D-08-02): atomic NDJSON file sink.
+
+    Writes one ``json.dump(row) + '\\n'`` per row to a ``.tmp`` sibling; on
+    successful exit ``os.replace`` promotes to the target (atomic on POSIX
+    and Win32). On any exception (incl. KeyboardInterrupt), best-effort
+    unlinks the .tmp and never promotes — STREAM-04 invariant.
+    """
+    def __init__(self, output: Path):
+        self._target = output
+        self._tmp = output.with_suffix(output.suffix + ".tmp")  # Pitfall 8-D — multi-suffix preserve
+        self._fp = None
+
+    def __enter__(self):
+        self._fp = self._tmp.open("w", encoding="utf-8", newline="\n")
+        return self
+
+    def write(self, row: dict) -> None:
+        json.dump(row, self._fp, ensure_ascii=False)
+        self._fp.write("\n")
+
+    def __exit__(self, exc_type, exc, tb):
+        self._fp.close()
+        if exc_type is None:
+            os.replace(self._tmp, self._target)   # ONLY promotion path
+        else:
+            try:
+                os.unlink(self._tmp)
+            except OSError:
+                pass
+        return False  # never suppress
+
+    def close(self) -> None:
+        pass  # Protocol compliance; no-op when CM is used
+
+
+class _RowValidationError(Exception):
+    """D-08-06 sentinel: per-row validation failure carrying row index + PII-safe stderr line."""
+    def __init__(self, row_index: int, pointer_message: str) -> None:
+        self.row_index = row_index
+        self.pointer_message = pointer_message
+        super().__init__(pointer_message)
 
 
 def _select_sink(output: Path | None, post_url: str | None) -> _Sink:
