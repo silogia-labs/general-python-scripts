@@ -35,24 +35,23 @@ from quizify_csv_ingest import (
 # ---------------------------------------------------------------------------
 
 def test_http_post_sink_construct_silently() -> None:
-    """D-07-04: __init__ stores url with NO validation in Phase 7."""
-    sink = _HttpPostSink("https://example.test/hook")
-    assert sink.url == "https://example.test/hook"
+    """Phase 9 carry-forward: __init__ stores url + headers + timeout silently."""
+    sink = _HttpPostSink("https://example.test/hook", headers=[], timeout=30.0)
+    assert sink._url == "https://example.test/hook"
+    assert sink._headers == []
+    assert sink._timeout == 30.0
 
 
-def test_http_post_sink_stub_raises_on_write() -> None:
-    """D-07-04 / D-07-14: write() raises NotImplementedError citing Phase 9."""
-    sink = _HttpPostSink("https://example.test/hook")
-    with pytest.raises(NotImplementedError) as excinfo:
-        sink.write({"email": "x"})
-    assert "Phase 9" in str(excinfo.value), (
-        f"NotImplementedError must reference Phase 9 (got: {excinfo.value!r})"
-    )
+def test_http_post_sink_write_buffers_row() -> None:
+    """Phase 9 (D-09-10): write() appends to internal buffer; no POST yet."""
+    sink = _HttpPostSink("https://example.test/hook", headers=[], timeout=30.0)
+    sink.write({"email": "x"})
+    assert sink._rows == [{"email": "x"}]
 
 
 def test_http_post_sink_close_is_noop() -> None:
-    """D-07-04: close() is a no-op (returns None, no exception)."""
-    sink = _HttpPostSink("https://example.test/hook")
+    """Phase 9: close() is a no-op (CM is the active path)."""
+    sink = _HttpPostSink("https://example.test/hook", headers=[], timeout=30.0)
     assert sink.close() is None
 
 
@@ -61,46 +60,35 @@ def test_http_post_sink_close_is_noop() -> None:
 # ---------------------------------------------------------------------------
 
 def test_argparse_output_post_url_mutex_rejection() -> None:
-    """D-07-15: -o and --post-url together => SystemExit(2) (argparse mutex)."""
+    """D-07-15 carry-forward: -o and --post-url together => SystemExit(2)."""
     with pytest.raises(SystemExit) as excinfo:
-        main(["-o", "out.json", "--post-url", "https://y", "in.csv"])
+        main(["-o", "out.json", "--post-url", "https://y.test", "--validate", "in.csv"])
     assert excinfo.value.code == 2
 
 
 def test_post_url_with_missing_csv_returns_1_not_crash(tmp_path) -> None:
-    """B2: --post-url accepted by argparse; convert() catches the OSError on
-    file open and returns 1 deterministically. The sink is never instantiated,
-    so the stub's NotImplementedError is NOT the failure surface here.
-
-    Locked convert() except clause includes OSError -> return 1.
+    """Phase 9 carry-forward: --post-url + --validate accepted; OSError on file
+    open → exit 1 (convert() catches). Sink is constructed but its `_post_once`
+    is never reached because validation runs (and fails on missing CSV) first.
     """
-    rc = main(["--post-url", "https://y", str(tmp_path / "missing.csv")])
-    assert rc == 1, (
-        f"Expected rc=1 from OSError on missing CSV; got rc={rc!r}. "
-        "convert() must catch OSError and return 1 before reaching the sink."
-    )
-
-
-def test_post_url_with_real_csv_raises_not_implemented(sample_csv_path) -> None:
-    """B2: With a valid CSV, --post-url routes to _HttpPostSink. The first
-    sink.write(row) raises NotImplementedError, and convert() does NOT catch
-    it (locked except clause covers _EmptyCsvError, LayoutError, OSError only).
-    Therefore NotImplementedError propagates out of main()/convert().
-    """
-    with pytest.raises(NotImplementedError) as excinfo:
-        main(["--post-url", "https://y", str(sample_csv_path)])
-    assert "Phase 9" in str(excinfo.value)
+    rc = main([
+        "--post-url", "https://y.test", "--validate",
+        str(tmp_path / "missing.csv"),
+    ])
+    assert rc == 1, f"Expected rc=1 from OSError on missing CSV; got rc={rc!r}."
 
 
 # ---------------------------------------------------------------------------
 # _select_sink factory dispatch (D-07-11)
 # ---------------------------------------------------------------------------
 
-def _ns(output=None, post_url=None, ndjson=False, validate=False):
-    """Build a minimal argparse.Namespace for _select_sink (D-08-12 signature)."""
+def _ns(output=None, post_url=None, ndjson=False, validate=False,
+        header=None, timeout=30.0):
+    """Build a minimal argparse.Namespace for _select_sink (D-08-12 / D-09-13)."""
     import argparse
     return argparse.Namespace(
         output=output, post_url=post_url, ndjson=ndjson, validate=validate,
+        header=list(header or []), timeout=timeout,
     )
 
 
