@@ -17,10 +17,10 @@ Locked deferral: NDJSON+POST cross-product is **out of scope for v1.2** (v1.3 ca
 
 ### Streaming (STREAM)
 
-- [ ] **STREAM-01** — `--ndjson` boolean flag enables line-delimited JSON output; file-mode target only (`-o file.ndjson`); argparse rejects `--ndjson` + `--post-url`.
-- [ ] **STREAM-02** — Line separator is `\n` (open with `newline="\n"` to defeat Windows CRLF translation); one row per line, one trailing `\n` per emitted row.
-- [ ] **STREAM-03** — `--ndjson` + `--validate` validates each row against `schema["items"]` (compiled once); first failure exits 1 with categorical JSON Pointer.
-- [ ] **STREAM-04** — NDJSON file output is atomic: write to `.tmp` sibling, then `os.replace()`; mid-stream SIGINT leaves no partial file at the target path (verified by SIGINT test).
+- [x] **STREAM-01** — `--ndjson` boolean flag enables line-delimited JSON output; file-mode target only (`-o file.ndjson`); argparse rejects `--ndjson` + `--post-url`.
+- [x] **STREAM-02** — Line separator is `\n` (open with `newline="\n"` to defeat Windows CRLF translation); one row per line, one trailing `\n` per emitted row.
+- [x] **STREAM-03** — `--ndjson` + `--validate` validates each row against `schema["items"]` (compiled once); first failure exits 1 with categorical JSON Pointer.
+- [x] **STREAM-04** — NDJSON file output is atomic: write to `.tmp` sibling, then `os.replace()`; mid-stream SIGINT leaves no partial file at the target path (verified by SIGINT test).
 
 ### Refactor & Regression Lock (REFACTOR)
 
@@ -58,10 +58,10 @@ Locked deferral: NDJSON+POST cross-product is **out of scope for v1.2** (v1.3 ca
 | Requirement      | Phase    | Status  |
 |------------------|----------|---------|
 | REFACTOR-01      | Phase 7  | Complete |
-| STREAM-01        | Phase 8  | Pending |
-| STREAM-02        | Phase 8  | Pending |
-| STREAM-03        | Phase 8  | Pending |
-| STREAM-04        | Phase 8  | Pending |
+| STREAM-01        | Phase 8  | Complete |
+| STREAM-02        | Phase 8  | Complete |
+| STREAM-03        | Phase 8  | Complete |
+| STREAM-04        | Phase 8  | Complete |
 | AUTO-01          | Phase 9  | Pending |
 | AUTO-02          | Phase 9  | Pending |
 | AUTO-03          | Phase 9  | Pending |
