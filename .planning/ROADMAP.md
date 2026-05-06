@@ -6,4 +6,4 @@
   5. Default array-mode invocation remains byte-identical to v1.1 (TRAIL-03 golden-fixture regression test green); D-05 top-level key order unchanged; D-13 stdlib-only-at-runtime preserved.
 **Plans:** 2 plans
   - [x] 08-01-PLAN.md — RED scaffolding: test stubs for STREAM-01..04 + Pitfall 8-D regression + argparse rejections + synthetic 100-row CSV fixture + README `--ndjson` row (D-11 pre-stage).
-  - [ ] 08-02-PLAN.md — GREEN implementation: `_NdjsonFileSink` (CM) + `_ValidatingSink` decorator + `_RowValidationError` + `__enter__/__exit__` shims + `--ndjson` argparse flag + 2 post-parse `parser.error` checks + `_select_sink` extension + `convert()` rewrite.
+  - [x] 08-02-PLAN.md — GREEN implementation: `_NdjsonFileSink` (CM) + `_ValidatingSink` decorator + `_RowValidationError` + `__enter__/__exit__` shims + `--ndjson` argparse flag + 2 post-parse `parser.error` checks + `_select_sink` extension + `convert()` rewrite.
