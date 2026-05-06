@@ -156,7 +156,7 @@ function calculateContextProfile({
     if (isSenior) return "Senior";
     if (isDobleJornada) return "Doble jornada";
     if (isHogar) return "Hogar";
-    if (work.includes("remoto")) return "Reomoto";
+    if (work.includes("remoto")) return "Remoto";  // FIX MAKE-COSMETIC-01
     if (work.includes("oficina")) return "Oficinista";
     if (work.includes("nocturna")) return "Nocturno";
 
