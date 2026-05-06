@@ -9,10 +9,23 @@ import html
 import json
 import logging
 import os
+import re
+import socket
+import ssl
 import sys
 import unicodedata
+import urllib.error
+import urllib.parse
+import urllib.request
 from pathlib import Path
 from typing import Iterator, Protocol
+
+# Phase 9 (D-09-09): exit-code constants for HTTP/network failures.
+_EXIT_HTTP = 3        # AUTO-04/05/06: HTTP/network failure
+_EXIT_VALIDATION = 1  # carry-forward from D-06-21
+
+# Phase 9 (D-09-04): RFC 7230 token charset for HTTP header field-name validation.
+_HEADER_NAME_RE = re.compile(r"^[!#$%&'*+\-.^_`|~0-9A-Za-z]+$")
 
 CONTACT_PREFIX = (
     "First name",
@@ -94,24 +107,182 @@ class _FileSink:
         return False
 
 
+class _NoRedirectHandler(urllib.request.HTTPRedirectHandler):
+    """Phase 9 (D-09-01 / AUTO-05): reject ALL redirects categorically.
+
+    The original `req.full_url` is the only URL passed to the HTTPError —
+    the redirect target (`newurl`) is intentionally NEVER referenced so it
+    cannot leak through `err.url` into stderr (T-PII-01).
+    """
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        raise urllib.error.HTTPError(
+            req.full_url, code, "http_unexpected_redirect", headers, fp,
+        )
+
+
+class _HttpDeliveryError(Exception):
+    """Phase 9 sentinel: raised by `_HttpPostSink._flush_and_post` on any
+    HTTP/network failure. Caught by `_HttpPostSink.__exit__` which then
+    converts it to `sys.exit(_EXIT_HTTP)` (D-09-09)."""
+
+
+def _log_http_failure(reason: str, *,
+                      status: int | None = None,
+                      reason_class: str | None = None,
+                      body_bytes: int | None = None) -> None:
+    """Phase 9 (D-09-07): SOLE stderr chokepoint for HTTP/network failures.
+
+    Locked categorical key=value format (T-PII-01):
+      ``http_failure reason=<R> status=<N|-> reason_class=<C|-> body_bytes=<N|->``
+    """
+    def _or_dash(v):
+        return str(v) if v is not None else "-"
+    logging.error(
+        "http_failure reason=%s status=%s reason_class=%s body_bytes=%s",
+        reason, _or_dash(status), _or_dash(reason_class), _or_dash(body_bytes),
+    )
+
+
+def _parse_header(s: str) -> tuple[str, str]:
+    """Phase 9 (D-09-04): argparse `type=` callable for `--header "K: V"`.
+
+    Locked categorical rejection vocabulary:
+      header_crlf_rejected, header_missing_colon, header_empty_name, header_invalid_name.
+    """
+    if "\r" in s or "\n" in s:
+        raise argparse.ArgumentTypeError("header_crlf_rejected")
+    if ":" not in s:
+        raise argparse.ArgumentTypeError("header_missing_colon")
+    name, _, value = s.partition(":")
+    name = name.strip()
+    if not name:
+        raise argparse.ArgumentTypeError("header_empty_name")
+    if not _HEADER_NAME_RE.match(name):
+        raise argparse.ArgumentTypeError("header_invalid_name")
+    return name, value.lstrip()
+
+
+def _https_url(s: str) -> str:
+    """Phase 9 (D-09-13 / AUTO-05): argparse `type=` callable for `--post-url`.
+
+    Rejects any non-HTTPS scheme or empty netloc with the locked categorical
+    string ``post_url_https_required``.
+    """
+    parts = urllib.parse.urlsplit(s)
+    if parts.scheme != "https" or not parts.netloc:
+        raise argparse.ArgumentTypeError("post_url_https_required")
+    return s
+
+
 class _HttpPostSink:
-    """Phase 7 STUB. Real HTTP POST lands in Phase 9 (AUTO-01..06).
-    __init__ accepts the URL silently — NO validation in Phase 7 (D-07-04, D-07-12)."""
-    def __init__(self, url: str) -> None:
-        self.url = url
+    """Phase 9 (AUTO-01..06): single-shot HTTPS POST sink.
 
-    def write(self, row: dict) -> None:
-        raise NotImplementedError("HTTP POST delivery lands in Phase 9")
+    Buffer-and-POST shape (mirrors `_StdoutSink`/`_FileSink`): rows accumulate
+    in `self._rows`; the POST happens exactly once on `__exit__` IFF no
+    exception propagated AND at least one row was written. On any HTTP /
+    network failure, `_flush_and_post` raises `_HttpDeliveryError`; `__exit__`
+    catches it and calls `sys.exit(_EXIT_HTTP)` (D-09-09).
 
-    def close(self) -> None:
-        return None
+    Stdlib-only at runtime (D-13). Single default-SSL-context construction
+    per instance; single opener-open callsite per `_post_once`.
+    """
+    def __init__(
+        self,
+        url: str,
+        headers: list[tuple[str, str]] | None = None,
+        timeout: float = 30.0,
+    ) -> None:
+        self._url = url
+        self._headers = list(headers or [])
+        self._timeout = timeout
+        self._rows: list[dict] = []
+        self._opener = urllib.request.build_opener(
+            _NoRedirectHandler(),
+            urllib.request.HTTPSHandler(context=ssl.create_default_context()),
+        )
 
     def __enter__(self):
         return self
 
+    def write(self, row: dict) -> None:
+        self._rows.append(row)
+
+    def close(self) -> None:
+        # Protocol no-op; CM is the active path.
+        pass
+
     def __exit__(self, exc_type, exc, tb):
-        self.close()
-        return False
+        if exc_type is None and self._rows:
+            try:
+                self._flush_and_post()
+            except _HttpDeliveryError:
+                # D-09-09: HTTP/network failure → exit 3 after categorical log.
+                sys.exit(_EXIT_HTTP)
+        return False  # never suppress
+
+    def _post_once(self, req: urllib.request.Request):
+        """Single seam exposing the lone opener-open callsite.
+
+        Tests `mock.patch.object(_HttpPostSink, "_post_once", side_effect=...)`
+        to drive synthetic URLError reasons (Plan 09-01 PII suite).
+        """
+        return self._opener.open(req, timeout=self._timeout)
+
+    def _flush_and_post(self) -> None:
+        payload = json.dumps(self._rows, ensure_ascii=False).encode("utf-8")
+        # D-09-05: user-supplied Content-Type wins (case-insensitive name match).
+        resolved = list(self._headers)
+        if not any(name.lower() == "content-type" for name, _ in resolved):
+            resolved.append(("Content-Type", "application/json"))
+        req = urllib.request.Request(self._url, data=payload, method="POST")
+        for name, value in resolved:
+            req.add_header(name, value)
+        try:
+            with self._post_once(req) as resp:
+                resp.read()  # drain; status is 2xx if we reach here
+            return
+        except socket.timeout:
+            # Pitfall 5: socket.timeout BEFORE URLError catch (it inherits OSError,
+            # not URLError, but on some paths urllib re-raises it directly).
+            _log_http_failure("network_timeout")
+            raise _HttpDeliveryError("network_timeout")
+        except urllib.error.HTTPError as err:
+            cls = (
+                "3xx" if 300 <= err.code < 400
+                else "4xx" if 400 <= err.code < 500
+                else "5xx"
+            )
+            reason = {
+                "3xx": "http_unexpected_redirect",
+                "4xx": "http_client_error",
+                "5xx": "http_server_error",
+            }[cls]
+            cl = err.headers.get("Content-Length") if err.headers else None
+            body_bytes = int(cl) if (cl is not None and str(cl).isdigit()) else None
+            _log_http_failure(
+                reason, status=err.code, reason_class=cls, body_bytes=body_bytes,
+            )
+            # Best-effort fp close to suppress ResourceWarning (Pattern 3).
+            try:
+                err.close()
+            except Exception:
+                pass
+            raise _HttpDeliveryError(reason)
+        except urllib.error.URLError as err:
+            # Pitfall 5: classify err.reason — most-specific first.
+            r = err.reason
+            if isinstance(r, socket.timeout):
+                reason = "network_timeout"
+            elif isinstance(r, ssl.SSLError):
+                reason = "tls_error"
+            elif isinstance(r, ConnectionRefusedError):
+                reason = "connection_refused"
+            elif isinstance(r, socket.gaierror):
+                reason = "dns_error"
+            else:
+                reason = "network_error"
+            _log_http_failure(reason)
+            raise _HttpDeliveryError(reason)
 
 
 class _NdjsonFileSink:
@@ -202,7 +373,7 @@ def _select_sink(args: argparse.Namespace, schema_path: Path | None = None) -> _
     ``args.output is not None and args.post_url is None``.
     """
     if args.post_url is not None:
-        return _HttpPostSink(args.post_url)
+        return _HttpPostSink(args.post_url, args.header, args.timeout)
     if getattr(args, "ndjson", False) and args.output is not None:
         inner = _NdjsonFileSink(args.output)
         if getattr(args, "validate", False):
@@ -673,6 +844,8 @@ def convert(
     validate: bool = False,
     post_url: str | None = None,
     ndjson: bool = False,
+    headers: list[tuple[str, str]] | None = None,
+    timeout: float = 30.0,
 ) -> int:
     """Phase 7 refactor + Phase 8 NDJSON: iter_rows + sink dispatch.
 
@@ -683,6 +856,7 @@ def convert(
     # Build a minimal Namespace for _select_sink (D-08-12).
     sink_args = argparse.Namespace(
         output=output, post_url=post_url, ndjson=ndjson, validate=validate,
+        header=list(headers or []), timeout=timeout,
     )
 
     if ndjson:
@@ -746,8 +920,12 @@ def convert(
     return exit_code
 
 
-def main(argv: list[str] | None = None) -> int:
-    argv = argv if argv is not None else sys.argv[1:]
+def _build_parser() -> argparse.ArgumentParser:
+    """Phase 9: factored parser builder so tests can introspect defaults.
+
+    Centralizes argparse wiring; ``main`` is now a thin caller plus post-parse
+    checks. Used by ``tests/test_argparse_post_url.py::test_timeout_default_30``.
+    """
     parser = argparse.ArgumentParser(prog="quizify_csv_ingest")
     parser.add_argument("csv_path", type=Path)
     parser.add_argument("--dry-run", action="store_true")
@@ -756,8 +934,11 @@ def main(argv: list[str] | None = None) -> int:
     group = parser.add_mutually_exclusive_group()
     group.add_argument("-o", "--output", type=Path, default=None,
                        help="Write JSON array to PATH (UTF-8). Default: stdout.")
-    group.add_argument("--post-url", default=None,
-                       help="(Phase 9) HTTP POST delivery target. Stub in Phase 7.")
+    group.add_argument(
+        "--post-url", default=None, type=_https_url,
+        help="HTTPS URL for single-shot webhook POST (requires --validate). "
+             "Mutually exclusive with -o/--output and --ndjson.",
+    )
     parser.add_argument(
         "--emit-json",
         action="store_true",
@@ -778,6 +959,21 @@ def main(argv: list[str] | None = None) -> int:
         action="store_true",
         help="Emit line-delimited JSON; requires -o/--output, mutually exclusive with --post-url.",
     )
+    parser.add_argument(
+        "--header", action="append", default=[], type=_parse_header,
+        help='Repeatable: add "Name: Value" header (e.g., "Authorization: Bearer ..."). '
+             'CRLF rejected. Applies only with --post-url.',
+    )
+    parser.add_argument(
+        "--timeout", type=float, default=30.0,
+        help="HTTP request timeout in seconds (default: 30.0). Applies only with --post-url.",
+    )
+    return parser
+
+
+def main(argv: list[str] | None = None) -> int:
+    argv = argv if argv is not None else sys.argv[1:]
+    parser = _build_parser()
     args = parser.parse_args(argv)
 
     # D-08-11: post-parse mutex checks (locked categorical messages, T-PII-01).
@@ -785,6 +981,11 @@ def main(argv: list[str] | None = None) -> int:
         parser.error("--ndjson cannot be combined with --post-url")
     if args.ndjson and not args.output:
         parser.error("--ndjson requires -o/--output (no stdout NDJSON)")
+    # D-09-13: Phase 9 post-parse checks.
+    if args.post_url and not args.validate:
+        parser.error("post_url_requires_validate")
+    if args.timeout <= 0:
+        parser.error("timeout_invalid")
 
     quiz_title = _resolve_quiz_title(args, os.environ)
 
@@ -804,6 +1005,7 @@ def main(argv: list[str] | None = None) -> int:
     return convert(
         args.csv_path, trailer_override, args.output, quiz_title,
         validate=args.validate, post_url=args.post_url, ndjson=args.ndjson,
+        headers=args.header, timeout=args.timeout,
     )
 
 
