@@ -24,7 +24,7 @@ Locked deferral: NDJSON+POST cross-product is **out of scope for v1.2** (v1.3 ca
 
 ### Refactor & Regression Lock (REFACTOR)
 
-- [ ] **REFACTOR-01** — `convert()` refactored to use `iter_rows()` generator + sink abstraction (`_StdoutSink` / `_FileSink` / `_HttpPostSink`); default-flag invocation produces byte-identical output to v1.1 (golden-fixture regression test parallel to TRAIL-03).
+- [x] **REFACTOR-01** — `convert()` refactored to use `iter_rows()` generator + sink abstraction (`_StdoutSink` / `_FileSink` / `_HttpPostSink`); default-flag invocation produces byte-identical output to v1.1 (golden-fixture regression test parallel to TRAIL-03).
 
 ### Make.com JS Hygiene (MAKE)
 
@@ -57,7 +57,7 @@ Locked deferral: NDJSON+POST cross-product is **out of scope for v1.2** (v1.3 ca
 
 | Requirement      | Phase    | Status  |
 |------------------|----------|---------|
-| REFACTOR-01      | Phase 7  | Pending |
+| REFACTOR-01      | Phase 7  | Complete |
 | STREAM-01        | Phase 8  | Pending |
 | STREAM-02        | Phase 8  | Pending |
 | STREAM-03        | Phase 8  | Pending |
