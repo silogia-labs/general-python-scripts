@@ -194,3 +194,33 @@ Tests live under `tests/`. Layout classification, the row builder, CLI
 emission, structural invariants over the live sample CSV, golden-file diff
 against the example payload, `quiz_title` precedence, and README/`--help`
 drift are all exercised under `pytest`.
+
+### Make.com module tests
+
+The `make-scripts/` directory ships two co-owned Make.com IIFE modules
+(`quizify-mapping.js`, `score-calculations.js`) plus a zero-dependency
+`node:test` regression suite under `make-scripts/tests/`.
+
+Run from repo root (Node 20+ required):
+
+```sh
+node --test quizify-csv-to-json-webhook/make-scripts/
+```
+
+Or, equivalent shorthand for operators inside `make-scripts/`:
+
+```sh
+cd quizify-csv-to-json-webhook/make-scripts && npm test
+```
+
+No `npm install` is ever run — the package ships with empty `dependencies`
+and `devDependencies`, enforced by `tests/test_make_scripts_no_deps.py` in
+CI. Test fixtures under `make-scripts/tests/fixtures/` are synthetic-only
+(T-PII-01 carry-forward), enforced by `tests/test_make_scripts_no_pii.py`.
+
+After merging changes to `quizify-mapping.js` or `score-calculations.js`,
+operators must paste the updated module body into the live Make.com Code
+modules and re-run the inline-JSON verification fixtures in
+`make-scripts/CONVENTIONS.md` (CONTRACT-01 / MAKE-FIX-01 / MAKE-FIX-02).
+The `node --test` suite catches regressions before paste; CONVENTIONS.md
+fixtures catch operator drift after paste.
