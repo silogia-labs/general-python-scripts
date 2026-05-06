@@ -216,7 +216,7 @@ function mapRecord(record) {
     const is_menstrual = hasTag(tags, "menstrual");
 
     // Clinical complexity profile
-    let profile = "profile_base";
+    let profile;  // FIX MAKE-COSMETIC-02 — every branch in the immediately following if/else chain reassigns
     let email_template_id = "9199514";
 
     if (data.has_red_flags) {
