@@ -48,6 +48,7 @@ The `[validate]` extra installs `fastjsonschema` so the `--validate` flag can ch
 | `--quiz-title VALUE` | `""` | Quiz title; decoded via `html.unescape`; whitespace preserved. | `QUIZIFY_QUIZ_TITLE` |
 | `--validate` | off | Validate emitted JSON against `docs/webhook-schema.json` (requires `[validate]` extra). Validation runs only when JSON output is produced; `--dry-run` skips it. | — |
 | `--post-url URL` | `—` | (Phase 9) HTTP POST delivery target. Stub in v1.2 Phase 7; raises `NotImplementedError` if invoked. Mutually exclusive with `-o`. | — |
+| `--ndjson` | off (array mode) | Emit line-delimited JSON; requires `-o/--output`; cannot combine with `--post-url`. With `--validate`, validates each row against `schema["items"]` and exits 1 on first failure with a categorical JSON Pointer (no cell content). | — |
 
 ## Configuration
 
