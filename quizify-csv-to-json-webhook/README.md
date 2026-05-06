@@ -47,7 +47,9 @@ The `[validate]` extra installs `fastjsonschema` so the `--validate` flag can ch
 | `--emit-json` | off | Explicit JSON emission; redundant with default behavior. | — |
 | `--quiz-title VALUE` | `""` | Quiz title; decoded via `html.unescape`; whitespace preserved. | `QUIZIFY_QUIZ_TITLE` |
 | `--validate` | off | Validate emitted JSON against `docs/webhook-schema.json` (requires `[validate]` extra). Validation runs only when JSON output is produced; `--dry-run` skips it. | — |
-| `--post-url URL` | `—` | (Phase 9) HTTP POST delivery target. Stub in v1.2 Phase 7; raises `NotImplementedError` if invoked. Mutually exclusive with `-o`. | — |
+| `--post-url URL` | `—` | HTTPS-only single-shot POST of the JSON array body. Requires `--validate`. Mutually exclusive with `-o/--output` and `--ndjson`. Exit `3` on HTTP/network failure with categorical PII-safe stderr. | — |
+| `--header "K: V"` | `[]` | Repeatable: add an HTTP header to the POST request (e.g., `--header "Authorization: Bearer ..."`). CRLF in values rejected at argparse. Applies only with `--post-url`. | — |
+| `--timeout SECONDS` | `30.0` | HTTP request timeout in seconds (float). Applies only with `--post-url`. Values `<= 0` rejected at argparse. | — |
 | `--ndjson` | off (array mode) | Emit line-delimited JSON; requires `-o/--output`; cannot combine with `--post-url`. With `--validate`, validates each row against `schema["items"]` and exits 1 on first failure with a categorical JSON Pointer (no cell content). | — |
 
 ## Configuration
@@ -147,9 +149,8 @@ the value if numeric semantics are required.
 - Reserved placeholder keys (`product-recommendation`, `product-link-type`,
   `title`, `type-page-url`) emit `null` / `""` because the CSV cannot
   supply them.
-- HTTP POST / webhook-send mode is deferred to v1.2 Phase 9 (a CLI stub at
-  `--post-url` is present in Phase 7 and raises `NotImplementedError` if
-  invoked).
+- HTTP POST / webhook-send mode (`--post-url`) lands in v1.2 Phase 9 as
+  HTTPS-only single-shot delivery; see the CLI reference for the contract.
 
 ## Privacy notes
 
