@@ -138,3 +138,5 @@ youtube/out*/
 youtube/ids*.txt
 youtube/videos*.txt
 youtube/Afirmaciones-positivas*.txt
+
+.claude/
