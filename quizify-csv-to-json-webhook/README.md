@@ -159,8 +159,9 @@ the value if numeric semantics are required.
 - Reserved placeholder keys (`product-recommendation`, `product-link-type`,
   `title`, `type-page-url`) emit `null` / `""` because the CSV cannot
   supply them.
-- HTTP POST / webhook-send mode (`--post-url`) lands in v1.2 Phase 9 as
-  HTTPS-only single-shot delivery; see the CLI reference for the contract.
+- HTTP POST / webhook-send mode (`--post-url`) is HTTPS-only single-shot
+  delivery (no retries, no cross-host redirects); see the CLI reference
+  for the contract.
 
 ## Privacy notes
 

@@ -8,12 +8,12 @@ Locked deferral: NDJSON+POST cross-product is **out of scope for v1.2** (v1.3 ca
 
 ### Delivery — HTTP POST (AUTO)
 
-- [ ] **AUTO-01** — User can deliver the JSON payload directly to a webhook via `--post-url URL` (single-shot POST of array body; mutually exclusive with `-o/--output` via argparse).
-- [ ] **AUTO-02** — `--post-url` requires `--validate`; argparse exits 2 with categorical stderr if violated (no schema-invalid payloads on the wire).
-- [ ] **AUTO-03** — Repeatable `--header "K: V"` for auth/custom headers; CRLF in values rejected at argparse.
-- [ ] **AUTO-04** — `--timeout SECONDS` (default 30); timeout errors exit code `3` with PII-safe stderr.
-- [ ] **AUTO-05** — HTTPS-only (rejected at argparse); default `ssl.create_default_context()`; no cross-host redirects (custom opener); CI grep gate on `CERT_NONE` / `_create_unverified_context` / `verify=False`.
-- [ ] **AUTO-06** — Non-2xx responses exit `3` with categorical-only stderr (status code + reason class + body byte count); never response body content. Locked as D-06-2x templates; `TestHTTPErrorPIIsafe` negative-substring tests against `quizify-submissions.csv`-derived synthetic fixtures.
+- [x] **AUTO-01** — User can deliver the JSON payload directly to a webhook via `--post-url URL` (single-shot POST of array body; mutually exclusive with `-o/--output` via argparse).
+- [x] **AUTO-02** — `--post-url` requires `--validate`; argparse exits 2 with categorical stderr if violated (no schema-invalid payloads on the wire).
+- [x] **AUTO-03** — Repeatable `--header "K: V"` for auth/custom headers; CRLF in values rejected at argparse.
+- [x] **AUTO-04** — `--timeout SECONDS` (default 30); timeout errors exit code `3` with PII-safe stderr.
+- [x] **AUTO-05** — HTTPS-only (rejected at argparse); default `ssl.create_default_context()`; no cross-host redirects (custom opener); CI grep gate on `CERT_NONE` / `_create_unverified_context` / `verify=False`.
+- [x] **AUTO-06** — Non-2xx responses exit `3` with categorical-only stderr (status code + reason class + body byte count); never response body content. Locked as D-06-2x templates; `TestHTTPErrorPIIsafe` negative-substring tests against `quizify-submissions.csv`-derived synthetic fixtures.
 
 ### Streaming (STREAM)
 
@@ -62,12 +62,12 @@ Locked deferral: NDJSON+POST cross-product is **out of scope for v1.2** (v1.3 ca
 | STREAM-02        | Phase 8  | Complete |
 | STREAM-03        | Phase 8  | Complete |
 | STREAM-04        | Phase 8  | Complete |
-| AUTO-01          | Phase 9  | Pending |
-| AUTO-02          | Phase 9  | Pending |
-| AUTO-03          | Phase 9  | Pending |
-| AUTO-04          | Phase 9  | Pending |
-| AUTO-05          | Phase 9  | Pending |
-| AUTO-06          | Phase 9  | Pending |
+| AUTO-01          | Phase 9  | Complete |
+| AUTO-02          | Phase 9  | Complete |
+| AUTO-03          | Phase 9  | Complete |
+| AUTO-04          | Phase 9  | Complete |
+| AUTO-05          | Phase 9  | Complete |
+| AUTO-06          | Phase 9  | Complete |
 | MAKE-COSMETIC-01 | Phase 10 | Pending |
 | MAKE-COSMETIC-02 | Phase 10 | Pending |
 | MAKE-TEST-01     | Phase 10 | Pending |
