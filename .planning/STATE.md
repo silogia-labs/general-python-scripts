@@ -3,7 +3,7 @@ gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: Delivery & Make.com Hygiene
 status: completed
-last_updated: "2026-05-06T04:38:05.113Z"
+last_updated: "2026-05-06T04:46:52.535Z"
 last_activity: 2026-05-06 -- Phase 9 marked complete
 progress:
   total_phases: 4
@@ -92,5 +92,5 @@ None open. Two research-phase flags carried into the planning phase:
 
 ## Session Continuity
 
-Last session: 2026-05-05T00:00:00.000Z
+Last session: 2026-05-06T04:46:52.531Z
 Resume action: Run `/gsd-verify-work 9` to validate Phase 9 close, then `/gsd-transition` to Phase 10 (MAKE-COSMETIC + MAKE-TEST harness). Phase 9 deliverables: real `_HttpPostSink`, `_NoRedirectHandler`, `_log_http_failure`, `_parse_header`, `_https_url`, `_HttpDeliveryError`, `--header`/`--timeout` argparse flags, `_build_parser` factored. 5/5 CI grep gates pass; 158 tests GREEN.
