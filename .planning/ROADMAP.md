@@ -31,7 +31,7 @@
 - [x] **Phase 7: Refactor Scaffolding (no-op)** — Extract `iter_rows()` generator + sink abstraction with byte-identical default output. (2/2 plans) — completed 2026-05-06
 - [x] **Phase 8: STREAM-01 NDJSON Output** — `--ndjson` flag, per-row validation against `schema["items"]`, atomic file writes. (2/2 plans) — completed 2026-05-05
 - [ ] **Phase 9: AUTO-01 HTTP POST Delivery** — `--post-url` gated on `--validate`, HTTPS-only, PII-safe error logging via locked D-06-2x templates.
-- [ ] **Phase 10: Make.com Hygiene & Node Test Harness** — Cosmetic typo/dead-code fixes plus `node:test` regression net (parallel-safe with Phases 7-9).
+- [x] **Phase 10: Make.com Hygiene & Node Test Harness** — Cosmetic typo/dead-code fixes plus `node:test` regression net (parallel-safe with Phases 7-9). (completed 2026-05-06)
 
 ## Phase Details
 
@@ -87,10 +87,10 @@
   3. Both JS modules expose a pure `mapRecord(record)` function with `module.exports` guarded by `typeof module !== "undefined"`; deployed Make.com files paste in unchanged; `"use strict";` is at the top of every module; a `globalThis` snapshot test detects accidental global writes across `mapRecord(fixture)` calls.
   4. `make-scripts/package.json` ships with empty `dependencies` and empty `devDependencies` (CI gate enforces); `pyproject.toml` `[tool.pytest.ini_options]` adds `norecursedirs = ["make-scripts", "node_modules"]`; `make-scripts/.gitignore` blocks `node_modules/` and `coverage/`.
   5. JS test fixtures are synthetic-only (T-PII-01 carry-forward — no PII from `quizify-submissions.csv` in `make-scripts/tests/fixtures/`); README documentation additions for `make-scripts/` testing keep the D-11 ten-section lock + drift test green.
-**Plans:** 2/3 plans executed
+**Plans:** 3/3 plans complete
   - [x] 10-01-PLAN.md — RED scaffolding: mapRecord+footer wrap (typo+dead-init PRESERVED), 6 node:test files, fixtures, package.json, .gitignore, pyproject.toml norecursedirs, 2 Python grep-gate tests.
   - [x] 10-02-PLAN.md — GREEN cosmetic fixes: Reomoto→Remoto at score-calculations.js:157; remove dead profile_base init at :217. Flips 6/6 node:test files green.
-  - [ ] 10-03-PLAN.md — CI wiring + README docs: fresh .github/workflows/ci.yml with parallel pytest + make-scripts-test jobs; ### Make.com module tests subsection under ## Development (D-11 lock preserved).
+  - [x] 10-03-PLAN.md — CI wiring + README docs: fresh .github/workflows/ci.yml with parallel pytest + make-scripts-test jobs; ### Make.com module tests subsection under ## Development (D-11 lock preserved).
 
 ## Progress
 
@@ -105,4 +105,4 @@
 | 7. Refactor Scaffolding (no-op)     | v1.2 | 2/2 | Complete    | 2026-05-06 |
 | 8. STREAM-01 NDJSON Output          | v1.2 | 2/2 | Complete    | 2026-05-05 |
 | 9. AUTO-01 HTTP POST Delivery       | v1.2 | 2/2 | Complete    | 2026-05-05 |
-| 10. Make.com Hygiene & Node Tests   | v1.2 | 2/3 | In Progress|  |
+| 10. Make.com Hygiene & Node Tests   | v1.2 | 3/3 | Complete   | 2026-05-06 |
