@@ -1,17 +1,16 @@
 ---
 gsd_state_version: 1.0
-milestone: v1.1
-milestone_name: Contract Hardening & Make.com Alignment
-status: shipped
-stopped_at: v1.1 milestone closed
-last_updated: "2026-05-04T05:50:45.171Z"
-last_activity: 2026-05-04 -- v1.1 milestone archived and tagged
+milestone: v1.2
+milestone_name: Delivery & Make.com Hygiene
+status: planning
+last_updated: "2026-05-06T01:02:18.646Z"
+last_activity: 2026-05-06
 progress:
-  total_phases: 3
-  completed_phases: 3
-  total_plans: 9
-  completed_plans: 9
-  percent: 100
+  total_phases: 0
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
+  percent: 0
 ---
 
 # Project State
@@ -25,9 +24,10 @@ See: `.planning/PROJECT.md` (updated 2026-05-04 after v1.1 milestone)
 
 ## Current Position
 
-Milestone: v1.1 — SHIPPED 2026-05-04 (tag `v1.1`).
-Status: Awaiting `/gsd-new-milestone` for v1.2 scope definition.
-Last activity: 2026-05-04 -- v1.1 milestone archived
+Phase: Not started (defining requirements)
+Plan: —
+Status: Defining requirements
+Last activity: 2026-05-06 — Milestone v1.2 started
 
 ## Performance Metrics
 

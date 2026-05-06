@@ -13,7 +13,7 @@ Each CSV submission row becomes one webhook-compatible JSON object with correct 
 **Shipped: v1.1 Contract Hardening & Make.com Alignment (2026-05-04)** — see `.planning/MILESTONES.md` and `.planning/milestones/v1.1-ROADMAP.md`.
 **Shipped: v1.0 MVP (2026-05-03)** — see `.planning/milestones/v1.0-ROADMAP.md`.
 
-**Planning next milestone (v1.2 — TBD).** Likely candidates surfaced from v1.1 deferred bucket: AUTO-01 (HTTP POST delivery, gated on VALI-01), STREAM-01 (NDJSON streaming for >50k-row CSVs), MAKE-COSMETIC-01/02 (Make.com JS housekeeping), MAKE-TEST-01 (Node test harness if `make-scripts/` LOC grows).
+**In progress: v1.2 Delivery & Make.com Hygiene** — see Current Milestone section below.
 
 - 94 tests passing (1.28s) across layout, row-builder, CLI emission, PII logging, golden-file structure, structural invariants, quiz-title precedence, README/`--help` drift, default-order regression (TRAIL-03), scoring-index-map binding (TRAIL-01/02), and schema validation (VALI-01..05) including PII-safe failure-stderr tests.
 - Runtime stays stdlib-only (D-13 preserved via lazy import); `fastjsonschema>=2.21.2` is an opt-in `[validate]` extra installable via `pip install '.[validate]'`.
@@ -22,15 +22,23 @@ Each CSV submission row becomes one webhook-compatible JSON object with correct 
 - CLI surface: `csv_path` positional + `--dry-run`, `-v`/`--verbose`, `--trailer-columns`, `-o`/`--output`, `--emit-json`, `--quiz-title` (with `$QUIZIFY_QUIZ_TITLE` env fallback), `--validate` (opt-in JSON Schema gate).
 - Schema artifact: `quizify-csv-to-json-webhook/docs/webhook-schema.json` (Draft-07).
 
-## Next Milestone Goals (v1.2 — TBD)
+## Current Milestone: v1.2 Delivery & Make.com Hygiene
 
-Candidates surfaced from v1.1 close (defer/promote at next `/gsd-new-milestone`):
+**Goal:** Close the v1.1 deferred bucket — ship HTTP POST delivery gated on `--validate`, add streaming output for large CSVs, and clean up the co-owned Make.com JS modules with a Node test harness.
 
-- **AUTO-01** — HTTP POST delivery mode. v1.1 unblocked this by shipping VALI-01 (gates POSTs on schema validity).
-- **STREAM-01** — Streaming/NDJSON output for >50k-row CSVs (T-RESOURCE-01 carry-forward).
+**Target features:**
+
+- **AUTO-01** — HTTP POST delivery mode (gated on VALI-01 schema validity; stdlib `urllib` preserves D-13).
+- **STREAM-01** — Streaming / NDJSON output for >50k-row CSVs (T-RESOURCE-01 follow-through).
 - **MAKE-COSMETIC-01** — Fix `Reomoto` typo at `score-calculations.js:157`.
 - **MAKE-COSMETIC-02** — Remove dead `profile = "profile_base"` initializer at `score-calculations.js:217`.
-- **MAKE-TEST-01** — Introduce Node.js test harness for `make-scripts/` if/when JS files grow beyond ~500 LOC combined.
+- **MAKE-TEST-01** — Introduce Node.js test harness for `make-scripts/` (lands with cosmetic fixes, no longer gated on LOC).
+
+**Key context:**
+
+- AUTO-01 reuses `--validate` semantics — payloads must pass schema validation before egress.
+- T-PII-01 extends to HTTP error surfaces: log status codes + categorical reasons only, never payload bytes.
+- D-13 stdlib-only-at-runtime preserved: `urllib` for POST, no `requests` dependency.
 
 <details>
 <summary>Previous Milestone Goal Section — v1.1 (shipped 2026-05-04)</summary>
@@ -74,7 +82,7 @@ Candidates surfaced from v1.1 close (defer/promote at next `/gsd-new-milestone`)
 
 ### Active
 
-(None — awaiting `/gsd-new-milestone` for v1.2 requirements definition. Candidates carried forward in **Next Milestone Goals** section above.)
+(v1.2 requirements pending — see **Current Milestone** above. REQUIREMENTS.md will be regenerated this milestone.)
 
 ### Out of Scope
 
@@ -142,4 +150,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-05-04 after v1.1 Contract Hardening & Make.com Alignment milestone*
+*Last updated: 2026-05-05 — v1.2 Delivery & Make.com Hygiene milestone started*
