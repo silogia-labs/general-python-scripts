@@ -47,6 +47,7 @@ The `[validate]` extra installs `fastjsonschema` so the `--validate` flag can ch
 | `--emit-json` | off | Explicit JSON emission; redundant with default behavior. | — |
 | `--quiz-title VALUE` | `""` | Quiz title; decoded via `html.unescape`; whitespace preserved. | `QUIZIFY_QUIZ_TITLE` |
 | `--validate` | off | Validate emitted JSON against `docs/webhook-schema.json` (requires `[validate]` extra). Validation runs only when JSON output is produced; `--dry-run` skips it. | — |
+| `--post-url URL` | `—` | (Phase 9) HTTP POST delivery target. Stub in v1.2 Phase 7; raises `NotImplementedError` if invoked. Mutually exclusive with `-o`. | — |
 
 ## Configuration
 
@@ -145,8 +146,9 @@ the value if numeric semantics are required.
 - Reserved placeholder keys (`product-recommendation`, `product-link-type`,
   `title`, `type-page-url`) emit `null` / `""` because the CSV cannot
   supply them.
-- HTTP POST / webhook-send mode and JSON Schema validation are deferred to
-  v2.
+- HTTP POST / webhook-send mode is deferred to v1.2 Phase 9 (a CLI stub at
+  `--post-url` is present in Phase 7 and raises `NotImplementedError` if
+  invoked).
 
 ## Privacy notes
 
