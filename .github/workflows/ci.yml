@@ -1,0 +1,35 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  pytest:
+    name: pytest (quizify-csv-to-json-webhook)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install package + test deps
+        working-directory: quizify-csv-to-json-webhook
+        run: pip install -e '.[test]' || pip install -e .
+      - name: Run pytest
+        working-directory: quizify-csv-to-json-webhook
+        run: pytest -q
+
+  make-scripts-test:
+    name: make-scripts node:test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          # NO `cache: 'npm'` — empty deps, no lockfile (RESEARCH Pitfall 4).
+      - name: Run node:test
+        working-directory: quizify-csv-to-json-webhook/make-scripts
+        run: node --test
