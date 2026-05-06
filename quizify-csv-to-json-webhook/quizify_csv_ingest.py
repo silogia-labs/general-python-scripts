@@ -12,6 +12,7 @@ import os
 import sys
 import unicodedata
 from pathlib import Path
+from typing import Iterator, Protocol
 
 CONTACT_PREFIX = (
     "First name",
@@ -43,6 +44,145 @@ _OUTPUT_KEY_BY_CANONICAL: dict[str, str] = {
 
 class LayoutError(ValueError):
     """Raised when header row does not match expected Quizify layout."""
+
+
+class _Sink(Protocol):
+    def write(self, row: dict) -> None: ...
+    def close(self) -> None: ...
+
+
+class _StdoutSink:
+    """Buffers rows; emits the JSON array on close() to preserve byte identity (D-07-02)."""
+    def __init__(self) -> None:
+        self._rows: list[dict] = []
+
+    def write(self, row: dict) -> None:
+        self._rows.append(row)
+
+    def close(self) -> None:
+        json.dump(self._rows, sys.stdout, indent=2, ensure_ascii=False)
+        sys.stdout.write("\n")
+
+
+class _FileSink:
+    """Buffers rows; emits the JSON array on close() (D-07-03).
+    Atomic os.replace deferred to Phase 8 STREAM-04 — Phase 7 keeps direct-open."""
+    def __init__(self, output: Path) -> None:
+        self._output = output
+        self._rows: list[dict] = []
+
+    def write(self, row: dict) -> None:
+        self._rows.append(row)
+
+    def close(self) -> None:
+        with self._output.open("w", encoding="utf-8") as out_fh:
+            json.dump(self._rows, out_fh, indent=2, ensure_ascii=False)
+            out_fh.write("\n")
+
+
+class _HttpPostSink:
+    """Phase 7 STUB. Real HTTP POST lands in Phase 9 (AUTO-01..06).
+    __init__ accepts the URL silently — NO validation in Phase 7 (D-07-04, D-07-12)."""
+    def __init__(self, url: str) -> None:
+        self.url = url
+
+    def write(self, row: dict) -> None:
+        raise NotImplementedError("HTTP POST delivery lands in Phase 9")
+
+    def close(self) -> None:
+        return None
+
+
+def _select_sink(output: Path | None, post_url: str | None) -> _Sink:
+    """D-07-11: Argparse mutex guarantees output and post_url are not both set."""
+    if post_url is not None:
+        return _HttpPostSink(post_url)
+    if output is not None:
+        return _FileSink(output)
+    return _StdoutSink()
+
+
+# Module-private sentinel for empty-CSV signaling (RESEARCH Q5):
+class _EmptyCsvError(Exception):
+    """Raised by _RowStream.__iter__ when the CSV has no header row."""
+
+
+class _RowStream:
+    """Phase 7: streaming wrapper around the per-row build loop (D-07-05).
+
+    Single-iteration only — re-iterating reopens the file and resets state.
+    Caller materializes via list(stream); convert() reads stream.exit_code AFTER.
+    """
+    def __init__(
+        self,
+        path: Path,
+        trailer: tuple[str, ...] | None,
+        quiz_title: str,
+    ) -> None:
+        self.path = path
+        self.trailer = trailer
+        self.quiz_title = quiz_title
+        self.exit_code = 0
+
+    def __iter__(self) -> Iterator[dict]:
+        # single-iteration; re-iterating reopens the file and resets state.
+        # File-open OSError surfaces here — convert() catches it together
+        # with LayoutError and _EmptyCsvError at the list(self) call site.
+        with self.path.open(encoding="utf-8-sig", newline="") as fh:
+            reader = csv.reader(fh)
+            try:
+                header = next(reader)
+            except StopIteration:
+                raise _EmptyCsvError() from None
+
+            # classify_headers raises LayoutError on bad header; let it propagate.
+            _prefix_h, dynamic_h, _trailer_h, scoring_index_map, missing_trio_names = (
+                classify_headers(header, self.trailer)
+            )
+
+            # D-05-08 (locked WARNING template, Phase 5 carry-forward):
+            for name in missing_trio_names:
+                logging.warning(
+                    "trailer column %r absent from CSV header; emitting empty string for %s in all rows",
+                    name,
+                    _OUTPUT_KEY_BY_CANONICAL[name],
+                )
+
+            dynamic_headers_decoded = [decode_cell(h) for h in dynamic_h]
+            expected_len = len(header)
+            p_len = len(CONTACT_PREFIX)
+            t_len = len(self.trailer if self.trailer is not None else DEFAULT_TRAILER)
+
+            for idx, row in enumerate(reader, start=1):
+                if len(row) != expected_len:
+                    logging.warning(
+                        "row %d row length mismatch: expected %d fields, got %d",
+                        idx,
+                        expected_len,
+                        len(row),
+                    )
+                    self.exit_code |= 1
+                    continue
+                decoded = [decode_cell(c) for c in row]
+                prefix_d = decoded[:p_len]
+                dynamic_d = decoded[p_len : expected_len - t_len]
+                trailer_d = decoded[expected_len - t_len :]
+                row_dict, warnings_out = build_row(
+                    prefix_d, dynamic_d, trailer_d, dynamic_headers_decoded,
+                    self.quiz_title, scoring_index_map,
+                )
+                for w in warnings_out:
+                    logging.warning("row %d %s", idx, w)
+                yield row_dict
+
+
+def iter_rows(
+    path: Path,
+    trailer: tuple[str, ...] | None,
+    quiz_title: str,
+) -> _RowStream:
+    """ROADMAP SC#2 / D-07-06: public factory for the row-stream."""
+    return _RowStream(path, trailer, quiz_title)
 
 
 def normalize_key(s: str) -> str:
@@ -416,94 +556,34 @@ def convert(
     output: Path | None,
     quiz_title: str,
     validate: bool = False,
+    post_url: str | None = None,
 ) -> int:
-    """Phase 2 main path: CSV → list[dict] → JSON array on stdout or to file.
-
-    Per RESEARCH "Per-Row Build Sequence":
-      1. Open with utf-8-sig + newline=""
-      2. Read header, classify_headers; on LayoutError → log + return 1
-      3. Decode dynamic headers (D-14)
-      4. For each data row: length check, decode cells, build_row, log warnings
-      5. Dump results once (D-17: indent=2, ensure_ascii=False)
-
-    Note: results accumulate in memory. T-RESOURCE-01 (accept-with-threshold):
-    streaming/NDJSON output deferred to v2 if row count exceeds ~50k or per-row
-    payload > ~5KB (>250MB total).
-    """
-    exit_code = 0
-    results: list[dict] = []
+    """Phase 7 refactor: iter_rows + sink dispatch. Default behavior unchanged."""
+    stream = iter_rows(path, trailer, quiz_title)
     try:
-        fh = path.open(encoding="utf-8-sig", newline="")
+        results = list(stream)
+    except _EmptyCsvError:
+        logging.error("CSV is empty")
+        return 1
+    except LayoutError as err:
+        logging.error("%s", err)
+        return 1
     except OSError as err:
         logging.error("cannot open CSV: %s", err)
         return 1
-    with fh:
-        reader = csv.reader(fh)
-        try:
-            header = next(reader)
-        except StopIteration:
-            logging.error("CSV is empty")
-            return 1
-        try:
-            _prefix_h, dynamic_h, _trailer_h, scoring_index_map, missing_trio_names = classify_headers(
-                header, trailer
-            )
-        except LayoutError as err:
-            logging.error("%s", err)
-            return 1
-
-        # D-05-08 (locked template) / T-PII-01 / TRAIL-02:
-        # Emit one PII-safe WARNING per missing canonical trio column.
-        # %r yields single-quoted form (e.g. 'Result logic'); the values are
-        # compile-time constants — NEVER row indices, NEVER cell content.
-        for name in missing_trio_names:
-            logging.warning(
-                "trailer column %r absent from CSV header; emitting empty string for %s in all rows",
-                name,
-                _OUTPUT_KEY_BY_CANONICAL[name],
-            )
-
-        dynamic_headers_decoded = [decode_cell(h) for h in dynamic_h]
-        expected_len = len(header)
-        p_len = len(CONTACT_PREFIX)
-        t_len = len(trailer if trailer is not None else DEFAULT_TRAILER)
-
-        for idx, row in enumerate(reader, start=1):
-            if len(row) != expected_len:
-                logging.warning(
-                    "row %d row length mismatch: expected %d fields, got %d",
-                    idx,
-                    expected_len,
-                    len(row),
-                )
-                exit_code |= 1
-                continue
-            decoded = [decode_cell(c) for c in row]
-            prefix_d = decoded[:p_len]
-            dynamic_d = decoded[p_len : expected_len - t_len]
-            trailer_d = decoded[expected_len - t_len :]
-            row_dict, warnings_out = build_row(
-                prefix_d, dynamic_d, trailer_d, dynamic_headers_decoded, quiz_title,
-                scoring_index_map,
-            )
-            for w in warnings_out:
-                # `w` is constructed in build_row from column names + categorical
-                # values only — never cell content (T-PII-01).
-                logging.warning("row %d %s", idx, w)
-            results.append(row_dict)
+    exit_code = stream.exit_code
 
     if validate:
         rc = _run_schema_validation(results, SCHEMA_PATH)
         if rc != 0:
             return rc
 
-    if output is None:
-        json.dump(results, sys.stdout, indent=2, ensure_ascii=False)
-        sys.stdout.write("\n")
-    else:
-        with output.open("w", encoding="utf-8") as out_fh:
-            json.dump(results, out_fh, indent=2, ensure_ascii=False)
-            out_fh.write("\n")
+    sink = _select_sink(output, post_url)
+    try:
+        for row in results:
+            sink.write(row)
+    finally:
+        sink.close()
     return exit_code
 
 
@@ -514,8 +594,11 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("-v", "--verbose", action="store_true")
     parser.add_argument("--trailer-columns", default=None)
-    parser.add_argument("-o", "--output", type=Path, default=None,
-                        help="Write JSON array to PATH (UTF-8). Default: stdout.")
+    group = parser.add_mutually_exclusive_group()
+    group.add_argument("-o", "--output", type=Path, default=None,
+                       help="Write JSON array to PATH (UTF-8). Default: stdout.")
+    group.add_argument("--post-url", default=None,
+                       help="(Phase 9) HTTP POST delivery target. Stub in Phase 7.")
     parser.add_argument(
         "--emit-json",
         action="store_true",
@@ -548,7 +631,10 @@ def main(argv: list[str] | None = None) -> int:
     if args.dry_run:
         return dry_run(args.csv_path, trailer_override)
 
-    return convert(args.csv_path, trailer_override, args.output, quiz_title, validate=args.validate)
+    return convert(
+        args.csv_path, trailer_override, args.output, quiz_title,
+        validate=args.validate, post_url=args.post_url,
+    )
 
 
 if __name__ == "__main__":
