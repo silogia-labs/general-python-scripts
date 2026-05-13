@@ -952,15 +952,17 @@ def convert(
             return rc
 
     sink = _select_sink(sink_args)
-    try:
+    # 260512-uzh: HTTP sink performs its single-shot POST inside __exit__,
+    # so it MUST be driven via the context-manager protocol. The other sinks
+    # (_StdoutSink/_FileSink) are CM-safe too — close() is a no-op when
+    # __exit__ has already run, so the with-block is universally correct.
+    with sink:
         for idx, row in enumerate(results, start=1):
             # 260512-uzh: per-row observability log (INFO; gated by --verbose).
             logging.info(
                 "row_built row=%d email=%s", idx, row.get("email", "-"),
             )
             sink.write(row)
-    finally:
-        sink.close()
     return exit_code
 
 
