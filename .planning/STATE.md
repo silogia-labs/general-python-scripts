@@ -27,7 +27,7 @@ See: `.planning/PROJECT.md` (updated 2026-05-04 after v1.1 milestone)
 Phase: 10 (make-com-hygiene-node-test-harness) — EXECUTING
 Plan: 3 of 3
 Status: Phase complete — ready for verification
-Last activity: 2026-05-06
+Last activity: 2026-05-13 - Completed quick task 260512-tb2: new CSV layout migration
 Progress: ███████░░░ 75% (3/4 v1.2 phases done; Phase 9 100% — both plans landed)
 
 ## Phases (v1.2)
@@ -79,6 +79,12 @@ None open. Two research-phase flags carried into the planning phase:
 
 - Phase 9 (AUTO-01): empirical Make.com 4xx response-body shape needed before locking D-06-2x templates.
 - Phase 10 (MAKE-TEST): empirical Make.com IIFE sandbox semantics for `module`, `"use strict"`, `console` to validate dual-export-guard pattern.
+
+### Quick Tasks Completed
+
+| # | Description | Date | Commit | Directory |
+|---|-------------|------|--------|-----------|
+| 260512-tb2 | Migrate to new CSV layout (drop "Lead Verified" column) | 2026-05-13 | d1616d9 | [260512-tb2-update-csv-ingest-script-to-new-layout-i](./quick/260512-tb2-update-csv-ingest-script-to-new-layout-i/) |
 
 ## Deferred Items (v1.3+ candidates)
 
