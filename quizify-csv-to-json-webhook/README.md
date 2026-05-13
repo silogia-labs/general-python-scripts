@@ -50,7 +50,7 @@ Exit codes: `1` = schema validation, `2` = argparse rejection, `3` = HTTP/networ
 
 | Flag | Default | Description | Env var |
 |------|---------|-------------|---------|
-| `--dry-run` | off | Print layout summary to stderr; no JSON output. | — |
+| `--dry-run` | off | Without `--post-url`: print layout summary to stderr; no JSON output. With `--post-url`: perform all build + validate steps, log each would-be HTTP request with `dry_run=true`, but perform zero network I/O. The new `row_built` and `http_request` INFO logs are visible only with `-v`/`--verbose` (existing logging contract preserved). | — |
 | `-v`, `--verbose` | WARNING | Raise log level to INFO with structural detail. | — |
 | `--trailer-columns CSV` | `None` | Override default trailer columns (comma-separated, ordered). | — |
 | `-o`, `--output PATH` | stdout | Write JSON array to PATH (UTF-8). | — |
