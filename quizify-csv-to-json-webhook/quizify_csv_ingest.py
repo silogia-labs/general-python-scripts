@@ -190,10 +190,12 @@ class _HttpPostSink:
         url: str,
         headers: list[tuple[str, str]] | None = None,
         timeout: float = 30.0,
+        dry_run: bool = False,
     ) -> None:
         self._url = url
         self._headers = list(headers or [])
         self._timeout = timeout
+        self._dry_run = dry_run
         self._rows: list[dict] = []
         self._opener = urllib.request.build_opener(
             _NoRedirectHandler(),
@@ -236,6 +238,15 @@ class _HttpPostSink:
         req = urllib.request.Request(self._url, data=payload, method="POST")
         for name, value in resolved:
             req.add_header(name, value)
+        # 260512-uzh: emit one INFO log per HTTP request BEFORE network attempt.
+        logging.info(
+            "http_request method=POST url=%s rows=%d bytes=%d dry_run=%s",
+            self._url, len(self._rows), len(payload),
+            "true" if self._dry_run else "false",
+        )
+        if self._dry_run:
+            # 260512-uzh: HTTP dry-run — log only, perform zero network I/O.
+            return
         try:
             with self._post_once(req) as resp:
                 resp.read()  # drain; status is 2xx if we reach here
@@ -372,7 +383,10 @@ def _select_sink(args: argparse.Namespace, schema_path: Path | None = None) -> _
     ``args.output is not None and args.post_url is None``.
     """
     if args.post_url is not None:
-        return _HttpPostSink(args.post_url, args.header, args.timeout)
+        return _HttpPostSink(
+            args.post_url, args.header, args.timeout,
+            dry_run=getattr(args, "dry_run", False),
+        )
     if getattr(args, "ndjson", False) and args.output is not None:
         inner = _NdjsonFileSink(args.output)
         if getattr(args, "validate", False):
@@ -867,6 +881,7 @@ def convert(
     ndjson: bool = False,
     headers: list[tuple[str, str]] | None = None,
     timeout: float = 30.0,
+    dry_run: bool = False,
 ) -> int:
     """Phase 7 refactor + Phase 8 NDJSON: iter_rows + sink dispatch.
 
@@ -877,7 +892,7 @@ def convert(
     # Build a minimal Namespace for _select_sink (D-08-12).
     sink_args = argparse.Namespace(
         output=output, post_url=post_url, ndjson=ndjson, validate=validate,
-        header=list(headers or []), timeout=timeout,
+        header=list(headers or []), timeout=timeout, dry_run=dry_run,
     )
 
     if ndjson:
@@ -896,7 +911,11 @@ def convert(
         stream = iter_rows(path, trailer, quiz_title)
         try:
             with sink:
-                for row in stream:
+                for idx, row in enumerate(stream, start=1):
+                    # 260512-uzh: per-row observability log (INFO; gated by --verbose).
+                    logging.info(
+                        "row_built row=%d email=%s", idx, row.get("email", "-"),
+                    )
                     sink.write(row)
         except _EmptyCsvError:
             logging.error("CSV is empty")
@@ -934,7 +953,11 @@ def convert(
 
     sink = _select_sink(sink_args)
     try:
-        for row in results:
+        for idx, row in enumerate(results, start=1):
+            # 260512-uzh: per-row observability log (INFO; gated by --verbose).
+            logging.info(
+                "row_built row=%d email=%s", idx, row.get("email", "-"),
+            )
             sink.write(row)
     finally:
         sink.close()
@@ -1020,13 +1043,16 @@ def main(argv: list[str] | None = None) -> int:
 
     configure_logging(args.verbose)
 
-    if args.dry_run:
+    # 260512-uzh: --dry-run keeps its layout-inspection semantic when no
+    # --post-url is set; combined with --post-url it overloads to HTTP dry-run
+    # (handled inside convert via the dry_run kwarg → _HttpPostSink).
+    if args.dry_run and not args.post_url:
         return dry_run(args.csv_path, trailer_override)
 
     return convert(
         args.csv_path, trailer_override, args.output, quiz_title,
         validate=args.validate, post_url=args.post_url, ndjson=args.ndjson,
-        headers=args.header, timeout=args.timeout,
+        headers=args.header, timeout=args.timeout, dry_run=args.dry_run,
     )
 
 
