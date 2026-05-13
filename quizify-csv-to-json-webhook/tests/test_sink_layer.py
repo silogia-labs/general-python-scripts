@@ -134,7 +134,7 @@ def test_iter_rows_does_not_prefetch_all_rows_on_first_yield(sample_csv_path) ->
     Wraps `quizify_csv_ingest.build_row` with a call counter via patch.object.
     After exactly ONE next() pull from the generator, assert the wrapper was
     invoked exactly 1 time. A hidden `list(reader)` inside __iter__ that
-    eagerly built every row would invoke build_row 42 times before yielding,
+    eagerly built every row would invoke build_row 15 times before yielding,
     and this test would catch it.
     """
     original_build_row = quizify_csv_ingest.build_row
@@ -172,8 +172,8 @@ def test_iter_rows_exit_code_set_to_1_on_row_length_mismatch(tmp_path, caplog) -
     bad_csv = tmp_path / "bad.csv"
     sample = Path(__file__).resolve().parents[1] / "docs" / "quizify-submissions.csv"
     with sample.open(encoding="utf-8-sig", newline="") as src:
-        reader = _csv.reader(src)
-        header = next(reader)
+        reader = _csv.reader(src, skipinitialspace=True)
+        header = [h.rstrip() for h in next(reader)]
     with bad_csv.open("w", encoding="utf-8", newline="") as dst:
         writer = _csv.writer(dst)
         writer.writerow(header)

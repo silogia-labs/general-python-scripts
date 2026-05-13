@@ -55,7 +55,7 @@ def test_sigint_leaves_no_target(tmp_path):
     # Build a large synthetic CSV so SIGINT can land mid-stream.
     big = tmp_path / "big.csv"
     header_cells = [
-        "First name", "Last name", "Email", "Lead Verified",
+        "First name", "Last name", "Email",
         "Phone", "Subscribed to newsletter",
         "question-1",
         "Result logic", "Score category", "Score value",
@@ -65,7 +65,7 @@ def test_sigint_leaves_no_target(tmp_path):
     for i in range(20000):
         cells = [
             f"F{i}", f"L{i}", f"row-{i}@example.test",
-            "false", f"+1 555 0{i:04d}", "Yes",
+            f"+1 555 0{i:04d}", "Yes",
             "55", "Result A", "Cat A", "100", "", "01:23", "2026-05-05",
         ]
         rows.append(",".join('"' + c + '"' for c in cells))

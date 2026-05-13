@@ -23,7 +23,7 @@ def test_default_invocation_emits_json_to_stdout() -> None:
     assert result.returncode == 0, result.stderr
     payload = json.loads(result.stdout)
     assert isinstance(payload, list)
-    assert len(payload) == 42
+    assert len(payload) == 15
     first = payload[0]
     for k in (
         "firstName",
@@ -59,7 +59,7 @@ def test_output_flag_writes_file(tmp_path: Path) -> None:
     assert result.returncode == 0, result.stderr
     assert out.exists()
     data = json.loads(out.read_text(encoding="utf-8"))
-    assert len(data) == 42
+    assert len(data) == 15
     # No JSON on stdout when writing to file
     assert result.stdout.strip() == ""
 
@@ -86,7 +86,7 @@ def test_dry_run_still_works() -> None:
         check=False,
     )
     assert result.returncode == 0
-    assert "Rows (data): 42" in result.stderr
+    assert "Rows (data): 15" in result.stderr
     assert "Questions (dynamic): 20" in result.stderr
 
 

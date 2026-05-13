@@ -14,7 +14,7 @@ FIXTURE = ROOT / "docs" / "quizify-submissions.csv"
 
 def _read_header() -> list[str]:
     with FIXTURE.open(encoding="utf-8-sig", newline="") as f:
-        return next(csv.reader(f))
+        return [h.rstrip() for h in next(csv.reader(f, skipinitialspace=True))]
 
 
 def _write_csv(path: Path, header: list[str], rows: list[list[str]]) -> None:
@@ -31,12 +31,12 @@ def _good_dynamic(k: int) -> list[str]:
 
 def test_warning_for_unexpected_status_does_not_contain_email(tmp_path: Path) -> None:
     header = _read_header()
-    k = len(header) - 12  # contact(6) + trailer(6)
+    k = len(header) - 11  # contact(5) + trailer(6)
     leak_email = "leak@example.com"
     leak_phone = "+52 55 9999 9999"
     bad_status = "Maybe"
     row = (
-        ["Leakage", "Person", leak_email, "false", leak_phone, bad_status]
+        ["Leakage", "Person", leak_email, leak_phone, bad_status]
         + _good_dynamic(k)
         + ["", "", "", "", "00:10", "2026-01-01"]
     )
@@ -62,7 +62,7 @@ def test_warning_for_unmatched_tag_does_not_contain_free_text_answer(
     tmp_path: Path,
 ) -> None:
     header = _read_header()
-    k = len(header) - 12
+    k = len(header) - 11
     secret_answer = "SECRET_FREE_TEXT_ANSWER_PII"
     leak_email = "tagleak@example.com"
     dyn = _good_dynamic(k)
@@ -70,7 +70,7 @@ def test_warning_for_unmatched_tag_does_not_contain_free_text_answer(
     if k > 6:
         dyn[6] = secret_answer
     row = (
-        ["TagTest", "User", leak_email, "false", "+52 55 0000 7777", "Yes"]
+        ["TagTest", "User", leak_email, "+52 55 0000 7777", "Yes"]
         + dyn
         + ["", "", "", "totally_unknown_tag", "00:10", "2026-01-01"]
     )
@@ -97,11 +97,11 @@ def test_warning_for_row_length_mismatch_does_not_contain_cell_values(
     header = _read_header()
     leak_email = "ohno@example.com"
     bad = tmp_path / "bad.csv"
-    # Bad row has only 5 fields; one of them is a contact email
+    # Bad row has only 4 fields; one of them is a contact email
     with bad.open("w", encoding="utf-8", newline="") as f:
         w = csv.writer(f)
         w.writerow(header)
-        w.writerow(["Bad", "Row", leak_email, "false", "+52 55 0000 0000"])
+        w.writerow(["Bad", "Row", leak_email, "+52 55 0000 0000"])
 
     result = subprocess.run(
         [sys.executable, str(SCRIPT), str(bad)],

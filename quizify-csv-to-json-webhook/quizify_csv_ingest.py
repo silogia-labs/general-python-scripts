@@ -31,7 +31,6 @@ CONTACT_PREFIX = (
     "First name",
     "Last name",
     "Email",
-    "Lead Verified",
     "Phone",
     "Subscribed to newsletter",
 )
@@ -411,11 +410,12 @@ class _RowStream:
         # File-open OSError surfaces here — convert() catches it together
         # with LayoutError and _EmptyCsvError at the list(self) call site.
         with self.path.open(encoding="utf-8-sig", newline="") as fh:
-            reader = csv.reader(fh)
+            reader = csv.reader(fh, skipinitialspace=True)
             try:
                 header = next(reader)
             except StopIteration:
                 raise _EmptyCsvError() from None
+            header = [h.rstrip() for h in header]
 
             # classify_headers raises LayoutError on bad header; let it propagate.
             _prefix_h, dynamic_h, _trailer_h, scoring_index_map, missing_trio_names = (
@@ -445,7 +445,7 @@ class _RowStream:
                     )
                     self.exit_code |= 1
                     continue
-                decoded = [decode_cell(c) for c in row]
+                decoded = [decode_cell(c).rstrip() for c in row]
                 prefix_d = decoded[:p_len]
                 dynamic_d = decoded[p_len : expected_len - t_len]
                 trailer_d = decoded[expected_len - t_len :]
@@ -529,6 +529,8 @@ def classify_headers(
 
 TAG_HEADER_MAP = {
     "red_flag": "signos de alarma",
+    "pelvic_symptom": "piso pélvico",
+    "trigger": "disparadores",
     "goal_": "objetivo",
     "consent": "consiento",
 }
@@ -668,8 +670,8 @@ def build_row(
     first_name = prefix_cells_decoded[0]
     last_name = prefix_cells_decoded[1]
     email = prefix_cells_decoded[2]
-    phone = prefix_cells_decoded[4]
-    status_raw = prefix_cells_decoded[5]
+    phone = prefix_cells_decoded[3]
+    status_raw = prefix_cells_decoded[4]
 
     status_value, status_warn = map_status(status_raw)
     if status_warn is not None:
@@ -732,12 +734,13 @@ def configure_logging(verbose: bool) -> None:
 
 def dry_run(path: Path, trailer: tuple[str, ...] | None) -> int:
     with path.open(encoding="utf-8-sig", newline="") as f:
-        reader = csv.reader(f)
+        reader = csv.reader(f, skipinitialspace=True)
         try:
             header = next(reader)
         except StopIteration:
             logging.error("CSV is empty")
             return 1
+        header = [h.rstrip() for h in header]
         try:
             _prefix, dynamic, _trailer_h, _scoring_map, _missing = classify_headers(header, trailer)
         except LayoutError as err:

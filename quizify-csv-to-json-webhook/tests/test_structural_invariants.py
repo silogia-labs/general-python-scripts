@@ -60,9 +60,9 @@ def emitted_payload() -> tuple[list[dict], str]:
 
 
 def test_row_count_matches_sample(emitted_payload):
-    """Live sample CSV has 42 data rows; all should make it through."""
+    """Live sample CSV has 15 data rows; all should make it through."""
     rows, _ = emitted_payload
-    assert len(rows) == 42, f"expected 42 rows, got {len(rows)}"
+    assert len(rows) == 15, f"expected 15 rows, got {len(rows)}"
 
 
 def test_every_row_has_required_top_level_keys(emitted_payload):

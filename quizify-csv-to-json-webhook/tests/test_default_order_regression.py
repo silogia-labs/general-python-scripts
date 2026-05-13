@@ -42,8 +42,8 @@ def test_default_order_byte_identical_to_v1_0_baseline() -> None:
         "Default-order output diverged from v1.0 baseline; "
         "TRAIL-03 contract violated."
     )
-    # Sanity check: 42 rows survived
-    assert len(actual) == 42, f"expected 42 rows, got {len(actual)}"
+    # Sanity check: 15 rows survived
+    assert len(actual) == 15, f"expected 15 rows, got {len(actual)}"
     # Sanity check: scoring trio keys still present and bound to non-empty values
     # (default-order trailer in the sample CSV always supplies scoring)
     for r in actual:
@@ -70,7 +70,7 @@ def test_phase7_refactor_byte_identical_to_v1_0_baseline(capsys) -> None:
         "Phase 7 refactor diverged from v1.0/v1.1 baseline; "
         "REFACTOR-01 SC#1 (byte-identical default output) violated."
     )
-    assert len(actual) == 42
+    assert len(actual) == 15
     for r in actual:
         assert "result-logic" in r
         assert "score-category" in r

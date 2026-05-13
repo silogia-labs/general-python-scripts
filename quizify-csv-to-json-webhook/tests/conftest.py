@@ -23,8 +23,9 @@ def sample_csv_path() -> Path:
 def dynamic_headers() -> list[str]:
     """20 dynamic headers from the live sample CSV (raw, not yet decoded)."""
     with FIXTURE.open(encoding="utf-8-sig", newline="") as f:
-        header = next(csv.reader(f))
-    return header[6:-6]
+        header = next(csv.reader(f, skipinitialspace=True))
+    header = [h.rstrip() for h in header]
+    return header[5:-6]
 
 
 @pytest.fixture
@@ -38,7 +39,6 @@ def full_answers_row() -> dict:
         "Scarlette",
         "Tester",
         "scarlette@example.com",
-        "false",
         "+52 55 0000 0000",
         "Yes",
     ]
@@ -82,7 +82,6 @@ def red_flag_short_circuit_row() -> dict:
         "Maria",
         "Test",
         "maria@example.com",
-        "false",
         "+52 55 0000 0001",
         "",
     ]
@@ -98,7 +97,6 @@ def multi_select_synthetic_row() -> dict:
         "Multi",
         "Sel",
         "multi@example.com",
-        "false",
         "+52 55 0000 0002",
         "No",
     ]
@@ -164,7 +162,7 @@ def _synthetic_row(idx: int, malformed: bool = False) -> str:
         email = f"row-{idx}@example.test"
         phone = f"+1 555 01{idx:02d}"
         tags = ""
-    prefix = [first, last, email, "false", phone, "Yes"]
+    prefix = [first, last, email, phone, "Yes"]
     dynamic = ["55"]  # one neutral cell; satisfies build_row
     trailer = ["Result A", "Cat A", "100", tags, "01:23", "2026-05-05"]
     cells = prefix + dynamic + trailer
@@ -186,7 +184,7 @@ def csv_with_bad_row_at_50(tmp_path: Path) -> Path:
     See ``_synthetic_row`` docstring re: schema malformation strategy.
     """
     header_cells = [
-        "First name", "Last name", "Email", "Lead Verified",
+        "First name", "Last name", "Email",
         "Phone", "Subscribed to newsletter",
         "question-1",
         "Result logic", "Score category", "Score value",

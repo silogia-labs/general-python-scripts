@@ -29,7 +29,6 @@ CONTACT_PREFIX = (
     "First name",
     "Last name",
     "Email",
-    "Lead Verified",
     "Phone",
     "Subscribed to newsletter",
 )
@@ -63,7 +62,8 @@ def strip_id(obj):
 
 
 def _example_first_row() -> dict:
-    return json.loads(EXAMPLE.read_text(encoding="utf-8"))[0]
+    data = json.loads(EXAMPLE.read_text(encoding="utf-8"))
+    return data[0] if isinstance(data, list) else data
 
 
 def _build_aligned_csv(csv_path: Path) -> None:
@@ -83,11 +83,13 @@ def _build_aligned_csv(csv_path: Path) -> None:
     def cell_for(n: int) -> str:
         v = example[f"answers-{n}"]
         if isinstance(v, list):
+            if not v:
+                return ""
             name = v[0]["answer_name"]
-            if n == 7:
+            if n == 6:
                 # Force HTML entity present in source CSV for the round-trip
-                # assertion; the example shows the decoded form already.
-                return name.replace("(últimos 24 meses)", "&gt; 24 meses")
+                # assertion; the script must decode &gt; back to >.
+                return name + " &gt; placeholder"
             return name
         # multi-select string (q-14, q-15, q-16)
         return v
@@ -109,7 +111,6 @@ def _build_aligned_csv(csv_path: Path) -> None:
         "Silveimar",                # First name
         "Paez",                     # Last name
         "silverpaezp@gmail.com",    # Email
-        "false",                    # Lead Verified
         "+52 55 4888 7674",         # Phone
         "Yes",                      # Subscribed to newsletter
     ]
@@ -270,14 +271,14 @@ def test_reserved_placeholders_match_defaults(tmp_path):
 
 
 def test_html_entity_round_trip(tmp_path):
-    """Source `Postpartum &gt; 24 meses` decodes to `Postpartum > 24 meses`
-    in answer_name, and the raw stdout JSON contains no `&gt;` substring.
+    """Source `&gt;` decodes to `>` in answer_name, and the raw stdout JSON
+    contains no `&gt;` substring. q-6 is the round-trip target (see cell_for).
     """
     parsed, raw_stdout = run_aligned(tmp_path)
-    q7 = parsed[0]["answers-7"]
-    assert isinstance(q7, list), f"q-7 should be object array, got {type(q7).__name__}"
-    assert q7[0]["answer_name"] == "Postpartum > 24 meses", (
-        f"q-7 answer_name={q7[0]['answer_name']!r}"
+    q6 = parsed[0]["answers-6"]
+    assert isinstance(q6, list), f"q-6 should be object array, got {type(q6).__name__}"
+    assert " > placeholder" in q6[0]["answer_name"], (
+        f"q-6 answer_name={q6[0]['answer_name']!r}"
     )
     assert "&gt;" not in raw_stdout, "raw HTML entity leaked into emitted JSON"
 

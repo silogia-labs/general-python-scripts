@@ -24,8 +24,8 @@ SCRIPT = ROOT / "quizify_csv_ingest.py"
 
 def _read_header_row() -> list[str]:
     with FIXTURE.open(encoding="utf-8-sig", newline="") as f:
-        reader = csv.reader(f)
-        return next(reader)
+        reader = csv.reader(f, skipinitialspace=True)
+        return [h.rstrip() for h in next(reader)]
 
 
 def test_sample_csv_header_classification() -> None:
@@ -46,7 +46,7 @@ def test_data_row_count_matches_fixture() -> None:
         reader = csv.reader(f)
         next(reader)
         data_rows = list(reader)
-    assert len(data_rows) == 42
+    assert len(data_rows) == 15
 
 
 TRAILER_CLI = (
@@ -112,7 +112,7 @@ def test_dry_run_stderr_row_count() -> None:
         check=False,
     )
     assert result.returncode == 0
-    assert "Rows (data): 42" in result.stderr
+    assert "Rows (data): 15" in result.stderr
     assert "Questions (dynamic): 20" in result.stderr
     assert "Rango de edad" in result.stderr
     assert "@" not in result.stderr

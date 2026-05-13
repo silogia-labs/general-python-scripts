@@ -29,7 +29,6 @@ CONTACT_PREFIX = (
     "First name",
     "Last name",
     "Email",
-    "Lead Verified",
     "Phone",
     "Subscribed to newsletter",
 )
@@ -51,7 +50,6 @@ def _make_minimal_csv(tmp_path: Path) -> Path:
         "First",
         "Last",
         "user@example.com",
-        "false",
         "+52 55 0000 0000",
         "Yes",
         "Si",

@@ -45,7 +45,7 @@ class TestSchemaSelfValidation:
 
 
 class TestSamplePasses:
-    """VALI-01 / VALI-04 / D-06-25(b): 42-row sample emits and validates clean."""
+    """VALI-01 / VALI-04 / D-06-25(b): 15-row sample emits and validates clean."""
 
     def test_sample_csv_payload_validates(self, tmp_path: Path) -> None:
         fastjsonschema = pytest.importorskip("fastjsonschema")
@@ -53,7 +53,7 @@ class TestSamplePasses:
 
         out = tmp_path / "out.json"
         rc = convert(FIXTURE, None, out, "Autoevaluacion")
-        assert rc == 0, "convert() must succeed on the 42-row sample"
+        assert rc == 0, "convert() must succeed on the 15-row sample"
         payload = json.loads(out.read_text(encoding="utf-8"))
         assert isinstance(payload, list) and len(payload) > 0
 

@@ -41,7 +41,7 @@ def test_ndjson_happy_path(tmp_path):
     assert rc == 0
     assert out.exists()
     lines = out.read_text(encoding="utf-8").splitlines()
-    assert len(lines) == 42, f"expected 42 NDJSON lines, got {len(lines)}"
+    assert len(lines) == 15, f"expected 15 NDJSON lines, got {len(lines)}"
     for line in lines:
         d = json.loads(line)
         assert isinstance(d, dict)
@@ -64,7 +64,7 @@ def test_line_count_and_separator(tmp_path):
     assert rc == 0
     raw = out.read_bytes()
     nl = raw.count(b"\n")
-    assert nl == 42, f"expected 42 newline bytes, got {nl}"
+    assert nl == 15, f"expected 15 newline bytes, got {nl}"
     # Last byte should be a newline; no double-trailing-newline.
     assert raw.endswith(b"\n")
     assert not raw.endswith(b"\n\n")

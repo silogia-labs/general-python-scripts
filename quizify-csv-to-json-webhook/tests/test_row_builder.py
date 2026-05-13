@@ -90,12 +90,20 @@ def test_tag_distribution(dynamic_headers: list[str]) -> None:
     assert matched2.get(2) == ["has_red_flags", "no_red_flag"]
     assert unmatched2 == []
 
+    # New mappings: no_pelvic_symptom → q-14 (piso pélvico); no_triggers → q-15 (disparadores)
+    matched_pelv, unmatched_pelv = match_tags_to_questions(
+        "no_pelvic_symptom, no_triggers", dynamic_headers
+    )
+    assert matched_pelv.get(13) == ["no_pelvic_symptom"]
+    assert matched_pelv.get(14) == ["no_triggers"]
+    assert unmatched_pelv == []
+
     # Wholly unmatched tag (no pattern in TAG_HEADER_MAP fits)
     matched3, unmatched3 = match_tags_to_questions(
-        "no_pelvic_symptom", dynamic_headers
+        "unknown_xyz_tag", dynamic_headers
     )
     assert matched3 == {}
-    assert unmatched3 == ["no_pelvic_symptom"]
+    assert unmatched3 == ["unknown_xyz_tag"]
 
     # Empty input → empty buckets, no warnings
     assert match_tags_to_questions("", dynamic_headers) == ({}, [])
@@ -449,7 +457,7 @@ class TestMissingColumnWarning:
         )
         header = list(CONTACT_PREFIX) + ["q1"] + list(custom_trailer)
         row = [
-            "First", "Last", "x@example.com", "Yes", "555-0100", "Yes",
+            "First", "Last", "x@example.com", "555-0100", "Yes",
             "Q1 cell",
             "note text", "cat", "100", "tag1", "00:30", "2024-01-15",
         ]
