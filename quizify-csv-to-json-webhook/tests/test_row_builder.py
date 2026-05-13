@@ -276,14 +276,11 @@ def test_full_answers_synthetic_row_shape(
         if n not in (3, 17, 20):
             assert row[f"answers-tags-{n}"] == "", f"expected empty for n={n}"
 
-    # answers-3 single-token → object array
-    assert row["answers-3"] == [
-        {"answer_name": "Ninguno", "answer_img": None, "answer_tag": None}
-    ]
+    # answers-3 is a multi-select question (signos de alarma) — always string
+    assert row["answers-3"] == "Ninguno"
 
-    # answers-14 multi-comma → string
+    # answers-14 is a multi-select question (piso pélvico) — always string
     assert isinstance(row["answers-14"], str)
-    assert ", " in row["answers-14"]
 
     # No "id" key anywhere
     assert '"id"' not in json.dumps(row, ensure_ascii=False)

@@ -553,14 +553,32 @@ def decode_cell(s: str) -> str:
     return html.unescape(s)
 
 
-def shape_answer(decoded: str):
+MULTI_SELECT_HEADER_KEYWORDS = (
+    "signos de alarma",
+    "piso pélvico",
+    "disparadores",
+    "limitaciones",
+)
+
+
+def _is_multi_select_header(header_decoded: str) -> bool:
+    norm = _norm_for_match(header_decoded)
+    return any(_norm_for_match(kw) in norm for kw in MULTI_SELECT_HEADER_KEYWORDS)
+
+
+def shape_answer(decoded: str, header_decoded: str = ""):
     """Return webhook-shaped answer per D-05/D-06/D-08.
 
-    "" → "" ; ", " in cell → plain string ; else → single-element object array.
+    "" → ""
+    Multi-select question (by header) → plain string (regardless of token count).
+    ", " in cell → plain string.
+    Else → single-element object array.
     Never emits an "id" key (D-07).
     """
     if decoded == "":
         return ""
+    if header_decoded and _is_multi_select_header(header_decoded):
+        return decoded
     if ", " in decoded:
         return decoded
     return [{"answer_name": decoded, "answer_img": None, "answer_tag": None}]
@@ -709,7 +727,7 @@ def build_row(
         n = i + 1
         cell = dynamic_cells_decoded[i] if i < len(dynamic_cells_decoded) else ""
         row[f"question-{n}"] = header
-        row[f"answers-{n}"] = shape_answer(cell)
+        row[f"answers-{n}"] = shape_answer(cell, header)
         row[f"answers-tags-{n}"] = ", ".join(matched_buckets.get(i, []))
     # TRAIL-01 / D-05-04 / D-05-10 / Pitfall 10:
     # Name-keyed scoring trio binding. The lookup index comes from

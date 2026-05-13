@@ -29,13 +29,7 @@
     ],
     "answers-tags-2": "",
     "question-3": "Reflexiona, ¿has presentado alguno de estos signos de alarma?",
-    "answers-3": [
-      {
-        "answer_name": "Antecedente de cáncer",
-        "answer_img": null,
-        "answer_tag": null
-      }
-    ],
+    "answers-3": "Antecedente de cáncer",
     "answers-tags-3": "has_red_flags",
     "question-4": "Calidad de sueño",
     "answers-4": "",
@@ -126,13 +120,7 @@
     ],
     "answers-tags-2": "",
     "question-3": "Reflexiona, ¿has presentado alguno de estos signos de alarma?",
-    "answers-3": [
-      {
-        "answer_name": "Pérdida de control de esfínteres",
-        "answer_img": null,
-        "answer_tag": null
-      }
-    ],
+    "answers-3": "Pérdida de control de esfínteres",
     "answers-tags-3": "has_red_flags",
     "question-4": "Calidad de sueño",
     "answers-4": "",
@@ -223,13 +211,7 @@
     ],
     "answers-tags-2": "",
     "question-3": "Reflexiona, ¿has presentado alguno de estos signos de alarma?",
-    "answers-3": [
-      {
-        "answer_name": "Ninguno",
-        "answer_img": null,
-        "answer_tag": null
-      }
-    ],
+    "answers-3": "Ninguno",
     "answers-tags-3": "no_red_flag",
     "question-4": "Calidad de sueño",
     "answers-4": [
@@ -322,25 +304,13 @@
     ],
     "answers-tags-13": "",
     "question-14": "¿Presentas alguno de estos síntomas de piso pélvico?",
-    "answers-14": [
-      {
-        "answer_name": "Dolor en penetración o examen",
-        "answer_img": null,
-        "answer_tag": null
-      }
-    ],
+    "answers-14": "Dolor en penetración o examen",
     "answers-tags-14": "",
     "question-15": "Disparadores de crisis",
     "answers-15": "Fase premenstrual/menstrual, Sentado prolongado/teletrabajo",
     "answers-tags-15": "",
     "question-16": "Limitaciones funcionales",
-    "answers-16": [
-      {
-        "answer_name": "Afecta vida sexual",
-        "answer_img": null,
-        "answer_tag": null
-      }
-    ],
+    "answers-16": "Afecta vida sexual",
     "answers-tags-16": "",
     "question-17": "Mi objetivo principal es...",
     "answers-17": [
@@ -689,13 +659,7 @@
     ],
     "answers-tags-2": "",
     "question-3": "Reflexiona, ¿has presentado alguno de estos signos de alarma?",
-    "answers-3": [
-      {
-        "answer_name": "Ninguno",
-        "answer_img": null,
-        "answer_tag": null
-      }
-    ],
+    "answers-3": "Ninguno",
     "answers-tags-3": "no_red_flag",
     "question-4": "Calidad de sueño",
     "answers-4": [
@@ -788,31 +752,13 @@
     ],
     "answers-tags-13": "",
     "question-14": "¿Presentas alguno de estos síntomas de piso pélvico?",
-    "answers-14": [
-      {
-        "answer_name": "Escape de orina al toser/reír/saltar",
-        "answer_img": null,
-        "answer_tag": null
-      }
-    ],
+    "answers-14": "Escape de orina al toser/reír/saltar",
     "answers-tags-14": "",
     "question-15": "Disparadores de crisis",
-    "answers-15": [
-      {
-        "answer_name": "Sentado prolongado/teletrabajo",
-        "answer_img": null,
-        "answer_tag": null
-      }
-    ],
+    "answers-15": "Sentado prolongado/teletrabajo",
     "answers-tags-15": "",
     "question-16": "Limitaciones funcionales",
-    "answers-16": [
-      {
-        "answer_name": "Dificulta tareas domésticas",
-        "answer_img": null,
-        "answer_tag": null
-      }
-    ],
+    "answers-16": "Dificulta tareas domésticas",
     "answers-tags-16": "",
     "question-17": "Mi objetivo principal es...",
     "answers-17": [
@@ -888,13 +834,7 @@
     ],
     "answers-tags-2": "",
     "question-3": "Reflexiona, ¿has presentado alguno de estos signos de alarma?",
-    "answers-3": [
-      {
-        "answer_name": "Ninguno",
-        "answer_img": null,
-        "answer_tag": null
-      }
-    ],
+    "answers-3": "Ninguno",
     "answers-tags-3": "no_red_flag",
     "question-4": "Calidad de sueño",
     "answers-4": [
@@ -987,31 +927,13 @@
     ],
     "answers-tags-13": "",
     "question-14": "¿Presentas alguno de estos síntomas de piso pélvico?",
-    "answers-14": [
-      {
-        "answer_name": "Escape de orina al toser/reír/saltar",
-        "answer_img": null,
-        "answer_tag": null
-      }
-    ],
+    "answers-14": "Escape de orina al toser/reír/saltar",
     "answers-tags-14": "",
     "question-15": "Disparadores de crisis",
-    "answers-15": [
-      {
-        "answer_name": "Cargas/saltos/correr",
-        "answer_img": null,
-        "answer_tag": null
-      }
-    ],
+    "answers-15": "Cargas/saltos/correr",
     "answers-tags-15": "",
     "question-16": "Limitaciones funcionales",
-    "answers-16": [
-      {
-        "answer_name": "Afecta vida sexual",
-        "answer_img": null,
-        "answer_tag": null
-      }
-    ],
+    "answers-16": "Afecta vida sexual",
     "answers-tags-16": "",
     "question-17": "Mi objetivo principal es...",
     "answers-17": [
@@ -1269,13 +1191,7 @@
     ],
     "answers-tags-2": "",
     "question-3": "Reflexiona, ¿has presentado alguno de estos signos de alarma?",
-    "answers-3": [
-      {
-        "answer_name": "Ninguno",
-        "answer_img": null,
-        "answer_tag": null
-      }
-    ],
+    "answers-3": "Ninguno",
     "answers-tags-3": "no_red_flag",
     "question-4": "Calidad de sueño",
     "answers-4": [
@@ -1368,22 +1284,10 @@
     ],
     "answers-tags-13": "",
     "question-14": "¿Presentas alguno de estos síntomas de piso pélvico?",
-    "answers-14": [
-      {
-        "answer_name": "Ninguno",
-        "answer_img": null,
-        "answer_tag": null
-      }
-    ],
+    "answers-14": "Ninguno",
     "answers-tags-14": "no_pelvic_symptom",
     "question-15": "Disparadores de crisis",
-    "answers-15": [
-      {
-        "answer_name": "Sentado prolongado/teletrabajo",
-        "answer_img": null,
-        "answer_tag": null
-      }
-    ],
+    "answers-15": "Sentado prolongado/teletrabajo",
     "answers-tags-15": "",
     "question-16": "Limitaciones funcionales",
     "answers-16": "Dificulta cuidado de hijos, Afecta vida sexual",
@@ -1462,13 +1366,7 @@
     ],
     "answers-tags-2": "",
     "question-3": "Reflexiona, ¿has presentado alguno de estos signos de alarma?",
-    "answers-3": [
-      {
-        "answer_name": "Pérdida de control de esfínteres",
-        "answer_img": null,
-        "answer_tag": null
-      }
-    ],
+    "answers-3": "Pérdida de control de esfínteres",
     "answers-tags-3": "has_red_flags",
     "question-4": "Calidad de sueño",
     "answers-4": "",
@@ -1559,13 +1457,7 @@
     ],
     "answers-tags-2": "",
     "question-3": "Reflexiona, ¿has presentado alguno de estos signos de alarma?",
-    "answers-3": [
-      {
-        "answer_name": "Ninguno",
-        "answer_img": null,
-        "answer_tag": null
-      }
-    ],
+    "answers-3": "Ninguno",
     "answers-tags-3": "no_red_flag",
     "question-4": "Calidad de sueño",
     "answers-4": [
@@ -1658,31 +1550,13 @@
     ],
     "answers-tags-13": "",
     "question-14": "¿Presentas alguno de estos síntomas de piso pélvico?",
-    "answers-14": [
-      {
-        "answer_name": "Escape de orina al toser/reír/saltar",
-        "answer_img": null,
-        "answer_tag": null
-      }
-    ],
+    "answers-14": "Escape de orina al toser/reír/saltar",
     "answers-tags-14": "",
     "question-15": "Disparadores de crisis",
-    "answers-15": [
-      {
-        "answer_name": "Tos/estornudos/risas",
-        "answer_img": null,
-        "answer_tag": null
-      }
-    ],
+    "answers-15": "Tos/estornudos/risas",
     "answers-tags-15": "",
     "question-16": "Limitaciones funcionales",
-    "answers-16": [
-      {
-        "answer_name": "Ninguna",
-        "answer_img": null,
-        "answer_tag": null
-      }
-    ],
+    "answers-16": "Ninguna",
     "answers-tags-16": "",
     "question-17": "Mi objetivo principal es...",
     "answers-17": [
@@ -1758,13 +1632,7 @@
     ],
     "answers-tags-2": "",
     "question-3": "Reflexiona, ¿has presentado alguno de estos signos de alarma?",
-    "answers-3": [
-      {
-        "answer_name": "Dolor nocturno que no cede",
-        "answer_img": null,
-        "answer_tag": null
-      }
-    ],
+    "answers-3": "Dolor nocturno que no cede",
     "answers-tags-3": "has_red_flags",
     "question-4": "Calidad de sueño",
     "answers-4": "",
@@ -1855,13 +1723,7 @@
     ],
     "answers-tags-2": "",
     "question-3": "Reflexiona, ¿has presentado alguno de estos signos de alarma?",
-    "answers-3": [
-      {
-        "answer_name": "Debilidad progresiva en piernas",
-        "answer_img": null,
-        "answer_tag": null
-      }
-    ],
+    "answers-3": "Debilidad progresiva en piernas",
     "answers-tags-3": "has_red_flags",
     "question-4": "Calidad de sueño",
     "answers-4": "",

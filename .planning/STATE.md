@@ -85,6 +85,7 @@ None open. Two research-phase flags carried into the planning phase:
 | # | Description | Date | Commit | Directory |
 |---|-------------|------|--------|-----------|
 | 260512-tb2 | Migrate to new CSV layout (drop "Lead Verified" column) | 2026-05-13 | d1616d9 | [260512-tb2-update-csv-ingest-script-to-new-layout-i](./quick/260512-tb2-update-csv-ingest-script-to-new-layout-i/) |
+| 260512-twv | Fix multi-select detection by header; align tests with new payload | 2026-05-13 | pending | [260512-twv-fix-multi-select-detection-and-tag-distr](./quick/260512-twv-fix-multi-select-detection-and-tag-distr/) |
 
 ## Deferred Items (v1.3+ candidates)
 
