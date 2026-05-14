@@ -174,13 +174,14 @@ def _https_url(s: str) -> str:
 
 
 class _HttpPostSink:
-    """Phase 9 (AUTO-01..06): single-shot HTTPS POST sink.
+    """Phase 9 (AUTO-01..06): per-row HTTPS POST sink.
 
     Buffer-and-POST shape (mirrors `_StdoutSink`/`_FileSink`): rows accumulate
-    in `self._rows`; the POST happens exactly once on `__exit__` IFF no
-    exception propagated AND at least one row was written. On any HTTP /
-    network failure, `_flush_and_post` raises `_HttpDeliveryError`; `__exit__`
-    catches it and calls `sys.exit(_EXIT_HTTP)` (D-09-09).
+    in `self._rows`; on `__exit__` (no exception, ≥1 row) each row is POSTed
+    individually as a single JSON object. On the first HTTP/network failure
+    `_flush_and_post` raises `_HttpDeliveryError`; `__exit__` catches it and
+    calls `sys.exit(_EXIT_HTTP)` (D-09-09). Rows ordered before the failing
+    row may have already been delivered.
 
     Stdlib-only at runtime (D-13). Single default-SSL-context construction
     per instance; single opener-open callsite per `_post_once`.
@@ -230,69 +231,71 @@ class _HttpPostSink:
         return self._opener.open(req, timeout=self._timeout)
 
     def _flush_and_post(self) -> None:
-        payload = json.dumps(self._rows, ensure_ascii=False).encode("utf-8")
         # D-09-05: user-supplied Content-Type wins (case-insensitive name match).
+        # Resolve headers once; reused for every per-row Request.
         resolved = list(self._headers)
         if not any(name.lower() == "content-type" for name, _ in resolved):
             resolved.append(("Content-Type", "application/json"))
-        req = urllib.request.Request(self._url, data=payload, method="POST")
-        for name, value in resolved:
-            req.add_header(name, value)
-        # 260512-uzh: emit one INFO log per HTTP request BEFORE network attempt.
-        logging.info(
-            "http_request method=POST url=%s rows=%d bytes=%d dry_run=%s",
-            self._url, len(self._rows), len(payload),
-            "true" if self._dry_run else "false",
-        )
-        if self._dry_run:
-            # 260512-uzh: HTTP dry-run — log only, perform zero network I/O.
-            return
-        try:
-            with self._post_once(req) as resp:
-                resp.read()  # drain; status is 2xx if we reach here
-            return
-        except socket.timeout:
-            # Pitfall 5: socket.timeout BEFORE URLError catch (it inherits OSError,
-            # not URLError, but on some paths urllib re-raises it directly).
-            _log_http_failure("network_timeout")
-            raise _HttpDeliveryError("network_timeout")
-        except urllib.error.HTTPError as err:
-            cls = (
-                "3xx" if 300 <= err.code < 400
-                else "4xx" if 400 <= err.code < 500
-                else "5xx"
+        for row in self._rows:
+            payload = json.dumps(row, ensure_ascii=False).encode("utf-8")
+            email = row.get("email", "-") if isinstance(row, dict) else "-"
+            req = urllib.request.Request(self._url, data=payload, method="POST")
+            for name, value in resolved:
+                req.add_header(name, value)
+            # 260512-uzh: emit one INFO log per HTTP request BEFORE network attempt.
+            logging.info(
+                "http_request method=POST url=%s email=%s bytes=%d dry_run=%s",
+                self._url, email, len(payload),
+                "true" if self._dry_run else "false",
             )
-            reason = {
-                "3xx": "http_unexpected_redirect",
-                "4xx": "http_client_error",
-                "5xx": "http_server_error",
-            }[cls]
-            cl = err.headers.get("Content-Length") if err.headers else None
-            body_bytes = int(cl) if (cl is not None and str(cl).isdigit()) else None
-            _log_http_failure(
-                reason, status=err.code, reason_class=cls, body_bytes=body_bytes,
-            )
-            # Best-effort fp close to suppress ResourceWarning (Pattern 3).
+            if self._dry_run:
+                # 260512-uzh: HTTP dry-run — log only, perform zero network I/O.
+                continue
             try:
-                err.close()
-            except Exception:
-                pass
-            raise _HttpDeliveryError(reason)
-        except urllib.error.URLError as err:
-            # Pitfall 5: classify err.reason — most-specific first.
-            r = err.reason
-            if isinstance(r, socket.timeout):
-                reason = "network_timeout"
-            elif isinstance(r, ssl.SSLError):
-                reason = "tls_error"
-            elif isinstance(r, ConnectionRefusedError):
-                reason = "connection_refused"
-            elif isinstance(r, socket.gaierror):
-                reason = "dns_error"
-            else:
-                reason = "network_error"
-            _log_http_failure(reason)
-            raise _HttpDeliveryError(reason)
+                with self._post_once(req) as resp:
+                    resp.read()  # drain; status is 2xx if we reach here
+            except socket.timeout:
+                # Pitfall 5: socket.timeout BEFORE URLError catch (it inherits OSError,
+                # not URLError, but on some paths urllib re-raises it directly).
+                _log_http_failure("network_timeout")
+                raise _HttpDeliveryError("network_timeout")
+            except urllib.error.HTTPError as err:
+                cls = (
+                    "3xx" if 300 <= err.code < 400
+                    else "4xx" if 400 <= err.code < 500
+                    else "5xx"
+                )
+                reason = {
+                    "3xx": "http_unexpected_redirect",
+                    "4xx": "http_client_error",
+                    "5xx": "http_server_error",
+                }[cls]
+                cl = err.headers.get("Content-Length") if err.headers else None
+                body_bytes = int(cl) if (cl is not None and str(cl).isdigit()) else None
+                _log_http_failure(
+                    reason, status=err.code, reason_class=cls, body_bytes=body_bytes,
+                )
+                # Best-effort fp close to suppress ResourceWarning (Pattern 3).
+                try:
+                    err.close()
+                except Exception:
+                    pass
+                raise _HttpDeliveryError(reason)
+            except urllib.error.URLError as err:
+                # Pitfall 5: classify err.reason — most-specific first.
+                r = err.reason
+                if isinstance(r, socket.timeout):
+                    reason = "network_timeout"
+                elif isinstance(r, ssl.SSLError):
+                    reason = "tls_error"
+                elif isinstance(r, ConnectionRefusedError):
+                    reason = "connection_refused"
+                elif isinstance(r, socket.gaierror):
+                    reason = "dns_error"
+                else:
+                    reason = "network_error"
+                _log_http_failure(reason)
+                raise _HttpDeliveryError(reason)
 
 
 class _NdjsonFileSink:

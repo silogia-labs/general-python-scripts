@@ -52,8 +52,9 @@ def test_happy_path_one_request(mock_webhook):
     method, body, _ = received[0]
     assert method == "POST"
     parsed = json.loads(body.decode("utf-8"))
-    assert isinstance(parsed, list) and len(parsed) == 1
-    assert parsed[0]["email"] == "a@example.test"
+    # Per-row mode (260513): each POST body is a single row dict, not an array.
+    assert isinstance(parsed, dict)
+    assert parsed["email"] == "a@example.test"
 
 
 # ----- Pre-egress validation failure: NO socket touched -----------------------

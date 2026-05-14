@@ -140,3 +140,7 @@ youtube/videos*.txt
 youtube/Afirmaciones-positivas*.txt
 
 .claude/
+
+quizify-csv-to-json-webhook/out.json
+quizify-csv-to-json-webhook/docs/*.csv
+quizify-csv-to-json-webhook/docs/webhook-quizify-format-example-2.json
